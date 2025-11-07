@@ -7,13 +7,15 @@ import { Pool } from 'pg'
 const pool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false
-      },
+      ssl: process.env.DATABASE_URL.includes('localhost')
+        ? false
+        : {
+            rejectUnauthorized: false,
+          },
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
-      // Options for pgBouncer compatibility
+      // Options for pgBouncer/Supabase pooler compatibility
       application_name: 'treasuryx',
     })
   : null
