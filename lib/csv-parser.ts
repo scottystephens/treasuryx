@@ -77,7 +77,7 @@ function parseCSV<T>(filePath: string): Promise<T[]> {
       complete: (results) => {
         resolve(results.data as T[])
       },
-      error: (error) => {
+      error: (error: Error) => {
         reject(error)
       }
     })
