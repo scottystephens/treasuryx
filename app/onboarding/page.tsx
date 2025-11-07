@@ -88,13 +88,29 @@ export default function OnboardingPage() {
     setLoading(true)
 
     try {
-      // Call the database function to create tenant and add user as owner
-      const { data, error } = await supabase.rpc('create_tenant_with_owner', {
-        tenant_name: organizationName,
-        tenant_slug: slug,
-      })
+      // Create the tenant
+      const { data: tenantData, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          name: organizationName,
+          slug: slug,
+          plan: 'starter',
+        })
+        .select()
+        .single()
 
-      if (error) throw error
+      if (tenantError) throw tenantError
+
+      // Add the current user as owner
+      const { error: userTenantError } = await supabase
+        .from('user_tenants')
+        .insert({
+          user_id: user.id,
+          tenant_id: tenantData.id,
+          role: 'owner',
+        })
+
+      if (userTenantError) throw userTenantError
 
       // Success! Redirect to dashboard
       router.push('/dashboard')
