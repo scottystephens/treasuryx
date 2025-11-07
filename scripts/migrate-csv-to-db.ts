@@ -29,7 +29,7 @@ async function parseCSV(filePath: string): Promise<CSVRow[]> {
       complete: (results) => {
         resolve(results.data as CSVRow[])
       },
-      error: (error) => {
+      error: (error: Error) => {
         reject(error)
       }
     })
