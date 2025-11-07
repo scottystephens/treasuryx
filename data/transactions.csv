@@ -1,0 +1,22 @@
+transactionId,accountId,date,description,amount,currency,type,category,status,reference
+TXN001,ACC001,2024-11-01,Customer Payment - Acme Corp,250000,USD,Credit,Operating,Completed,INV-2024-1001
+TXN002,ACC001,2024-11-01,Payroll Transfer,-120000,USD,Debit,Operating,Completed,PAYROLL-NOV-W1
+TXN003,ACC002,2024-11-01,Salary Disbursement,-85000,USD,Debit,Operating,Completed,PAYROLL-NOV-W1
+TXN004,ACC003,2024-11-01,Product Sales Revenue,180000,GBP,Credit,Operating,Completed,INV-UK-1234
+TXN005,ACC004,2024-11-02,Equipment Purchase,-450000,EUR,Debit,Investing,Completed,PO-2024-0567
+TXN006,ACC001,2024-11-02,SaaS Subscription Revenue,95000,USD,Credit,Operating,Completed,INV-2024-1002
+TXN007,ACC005,2024-11-02,Office Rent Payment,-35000,SGD,Debit,Operating,Completed,RENT-NOV-2024
+TXN008,ACC006,2024-11-02,Consulting Fees,12500000,JPY,Credit,Operating,Completed,INV-JP-0891
+TXN009,ACC007,2024-11-03,Marketing Campaign,-75000,CAD,Debit,Operating,Completed,MKT-2024-Q4
+TXN010,ACC001,2024-11-03,Customer Payment - Beta LLC,420000,USD,Credit,Operating,Completed,INV-2024-1003
+TXN011,ACC009,2024-11-03,Treasury Bond Purchase,-2000000,USD,Debit,Investing,Completed,BOND-2024-11
+TXN012,ACC003,2024-11-03,Software License Sales,67000,GBP,Credit,Operating,Completed,INV-UK-1235
+TXN013,ACC001,2024-11-04,Cloud Infrastructure,-28000,USD,Debit,Operating,Completed,AWS-NOV-2024
+TXN014,ACC008,2024-11-04,Professional Services,195000,AUD,Credit,Operating,Completed,INV-AU-0456
+TXN015,ACC004,2024-11-04,Dividend Distribution,-1200000,EUR,Debit,Financing,Pending,DIV-2024-Q4
+TXN016,ACC001,2024-11-04,Customer Payment - Gamma Inc,315000,USD,Credit,Operating,Completed,INV-2024-1004
+TXN017,ACC002,2024-11-04,Benefits Payment,-42000,USD,Debit,Operating,Completed,BENEFITS-NOV
+TXN018,ACC005,2024-11-04,Hardware Sales,88000,SGD,Credit,Operating,Completed,INV-SG-0234
+TXN019,ACC007,2024-11-04,Legal Fees,-52000,CAD,Debit,Operating,Completed,LEGAL-OCT-2024
+TXN020,ACC001,2024-11-04,Annual Subscription - Delta Co,580000,USD,Credit,Operating,Completed,INV-2024-1005
+

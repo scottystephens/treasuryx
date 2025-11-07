@@ -1,0 +1,12 @@
+accountId,accountName,accountNumber,currency,balance,entityId,bankName,accountType,status
+ACC001,US Operating Account,****1234,USD,5420000,ENT001,JPMorgan Chase,Checking,Active
+ACC002,US Payroll Account,****5678,USD,850000,ENT001,JPMorgan Chase,Checking,Active
+ACC003,UK Operating Account,****9012,GBP,2100000,ENT002,Barclays,Checking,Active
+ACC004,Euro Treasury Account,****3456,EUR,8750000,ENT003,Deutsche Bank,Savings,Active
+ACC005,Singapore Operating,****7890,SGD,1650000,ENT004,DBS Bank,Checking,Active
+ACC006,Japan Operating,****2468,JPY,425000000,ENT005,MUFG Bank,Checking,Active
+ACC007,Canada Operating,****1357,CAD,3200000,ENT006,RBC,Checking,Active
+ACC008,Australia Treasury,****9753,AUD,4100000,ENT007,Westpac,Savings,Active
+ACC009,US Investment Account,****8642,USD,15000000,ENT001,Goldman Sachs,Investment,Active
+ACC010,UK Reserve Account,****1592,GBP,5500000,ENT002,HSBC,Savings,Active
+

@@ -1,0 +1,14 @@
+paymentId,fromAccount,toEntity,amount,currency,scheduledDate,status,approver,description,paymentType,priority
+PAY001,ACC001,Vendor-ABC-Corp,125000,USD,2024-11-05,Pending Approval,John Smith,Software License Renewal,Vendor Payment,High
+PAY002,ACC003,Vendor-UK-Tech,45000,GBP,2024-11-06,Approved,Sarah Johnson,IT Services Q4,Vendor Payment,Medium
+PAY003,ACC004,Bank-Deutsche,2500000,EUR,2024-11-07,Scheduled,Michael Chen,Loan Repayment,Financing,High
+PAY004,ACC001,Vendor-Cloud-Services,18500,USD,2024-11-05,Approved,Sarah Johnson,Cloud Hosting Nov,Vendor Payment,Low
+PAY005,ACC005,Vendor-SG-Office,28000,SGD,2024-11-08,Pending Approval,John Smith,Office Supplies,Vendor Payment,Low
+PAY006,ACC007,Employee-Bonus-Pool,150000,CAD,2024-11-10,Draft,Michael Chen,Q4 Performance Bonus,Payroll,Medium
+PAY007,ACC001,Vendor-Marketing-Agency,95000,USD,2024-11-06,Approved,Sarah Johnson,Digital Campaign,Vendor Payment,Medium
+PAY008,ACC006,Vendor-JP-Equipment,8500000,JPY,2024-11-09,Pending Approval,John Smith,Office Equipment,Vendor Payment,Medium
+PAY009,ACC009,Investment-Treasury-Bonds,5000000,USD,2024-11-07,Scheduled,Michael Chen,Treasury Investment,Investment,High
+PAY010,ACC003,Tax-Authority-HMRC,85000,GBP,2024-11-15,Draft,Sarah Johnson,Corporate Tax Q3,Tax Payment,High
+PAY011,ACC001,Vendor-Legal-Services,62000,USD,2024-11-08,Approved,John Smith,Legal Consultation,Vendor Payment,Medium
+PAY012,ACC008,Vendor-AU-Construction,275000,AUD,2024-11-12,Pending Approval,Michael Chen,Office Renovation,Vendor Payment,High
+
