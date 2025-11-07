@@ -259,6 +259,60 @@ export async function createForecast(forecast: {
   )
 }
 
+// Exchange Rate queries
+export async function getExchangeRates(date?: string) {
+  if (date) {
+    return await query(
+      'SELECT * FROM exchange_rates WHERE date = $1 ORDER BY currency_code',
+      [date]
+    )
+  }
+  return await query(`
+    SELECT * FROM exchange_rates 
+    WHERE date = (SELECT MAX(date) FROM exchange_rates)
+    ORDER BY currency_code
+  `)
+}
+
+export async function getLatestExchangeRate(currencyCode: string) {
+  const results = await query(
+    'SELECT * FROM exchange_rates WHERE currency_code = $1 ORDER BY date DESC LIMIT 1',
+    [currencyCode]
+  )
+  return results[0] || null
+}
+
+export async function upsertExchangeRate(data: {
+  currencyCode: string
+  currencyName: string
+  rate: number
+  date: string
+  source: string
+}) {
+  return await query(
+    `INSERT INTO exchange_rates (currency_code, currency_name, rate, date, source, updated_at)
+     VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+     ON CONFLICT (currency_code, date) 
+     DO UPDATE SET 
+       rate = EXCLUDED.rate,
+       currency_name = EXCLUDED.currency_name,
+       source = EXCLUDED.source,
+       updated_at = CURRENT_TIMESTAMP
+     RETURNING *`,
+    [data.currencyCode, data.currencyName, data.rate, data.date, data.source]
+  )
+}
+
+export async function getExchangeRateHistory(currencyCode: string, days: number = 30) {
+  return await query(
+    `SELECT * FROM exchange_rates 
+     WHERE currency_code = $1 
+       AND date >= CURRENT_DATE - INTERVAL '${days} days'
+     ORDER BY date DESC`,
+    [currencyCode]
+  )
+}
+
 // Health check
 export async function testConnection() {
   try {

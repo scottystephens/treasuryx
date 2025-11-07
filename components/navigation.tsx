@@ -8,6 +8,7 @@ import {
   Building2, 
   Send,
   TrendingUp,
+  DollarSign,
   Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Entities', href: '/entities', icon: Building2 },
   { name: 'Payments', href: '/payments', icon: Send },
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
+  { name: 'Exchange Rates', href: '/rates', icon: DollarSign },
 ]
 
 export function Navigation() {
