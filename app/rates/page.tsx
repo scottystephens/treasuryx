@@ -1,16 +1,6 @@
-'use client'
-
-import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { 
-  ArrowUpDown, 
-  DollarSign, 
-  RefreshCw,
-  Search,
-  Download,
-  AlertCircle
-} from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 
 interface ExchangeRate {
   currency_code: string
@@ -50,45 +40,52 @@ const CURRENCIES: Currency[] = [
   { code: 'DKK', name: 'Danish Krone', symbol: 'kr', region: 'Denmark' },
 ]
 
-export default function ExchangeRatesPage() {
-  const [rates, setRates] = useState<ExchangeRate[]>([])
-  const [loading, setLoading] = useState(true)
-  const [usingFallback, setUsingFallback] = useState(false)
-  const [error, setError] = useState<string>('')
-
-  useEffect(() => {
-    fetch('/api/exchange-rates')
-      .then(res => res.json())
-      .then(data => {
-        setRates(data.rates || [])
-        setUsingFallback(!!data.usingFallback)
-        if (data.message) setError(data.message)
-        setLoading(false)
-      })
-      .catch(err => {
-        console.error('Fetch error:', err)
-        setError('Failed to load')
-        setLoading(false)
-      })
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
+async function getRates() {
+  try {
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000'
+    
+    const res = await fetch(`${baseUrl}/api/exchange-rates`, {
+      cache: 'no-store',
+    })
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`)
+    }
+    
+    return res.json()
+  } catch (error) {
+    console.error('Error fetching rates:', error)
+    return {
+      rates: [],
+      usingFallback: true,
+      message: 'Failed to load rates: ' + (error instanceof Error ? error.message : 'Unknown error')
+    }
   }
+}
+
+export default async function ExchangeRatesPage() {
+  const data = await getRates()
+  const rates: ExchangeRate[] = data.rates || []
+  const usingFallback = data.usingFallback || false
+  const message = data.message || ''
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Exchange Rates</h1>
-          <p className="text-gray-600">USD to major world currencies • Updated daily</p>
+          <p className="text-gray-600">USD to major world currencies • Updated daily at 00:00 UTC</p>
+          {rates.length > 0 && rates[0].date && (
+            <p className="text-sm text-gray-500 mt-1">
+              Last updated: {new Date(rates[0].date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </p>
+          )}
         </div>
 
         {usingFallback && (
@@ -97,11 +94,42 @@ export default function ExchangeRatesPage() {
               <AlertCircle className="w-5 h-5 text-yellow-600" />
               <div>
                 <h3 className="font-semibold text-yellow-900">Using Fallback Data</h3>
-                <p className="text-sm text-yellow-800">{error}</p>
+                <p className="text-sm text-yellow-800">{message}</p>
+                <p className="text-xs text-yellow-700 mt-2">
+                  To enable live rates, configure DATABASE_URL environment variable in Vercel.
+                </p>
               </div>
             </div>
           </Card>
         )}
+
+        <div className="grid gap-6 md:grid-cols-4 mb-8">
+          <Card className="p-6">
+            <div className="text-sm text-gray-600 mb-1">Total Currencies</div>
+            <div className="text-3xl font-bold text-gray-900">{rates.length}</div>
+          </Card>
+          
+          <Card className="p-6">
+            <div className="text-sm text-gray-600 mb-1">Highest Rate</div>
+            <div className="text-3xl font-bold text-gray-900">
+              {rates.length > 0 ? Math.max(...rates.map(r => r.rate)).toFixed(2) : '-'}
+            </div>
+          </Card>
+          
+          <Card className="p-6">
+            <div className="text-sm text-gray-600 mb-1">Lowest Rate</div>
+            <div className="text-3xl font-bold text-gray-900">
+              {rates.length > 0 ? Math.min(...rates.map(r => r.rate)).toFixed(4) : '-'}
+            </div>
+          </Card>
+          
+          <Card className="p-6">
+            <div className="text-sm text-gray-600 mb-1">Data Source</div>
+            <div className="text-lg font-bold text-gray-900">
+              {rates[0]?.source || 'N/A'}
+            </div>
+          </Card>
+        </div>
 
         <Card className="p-6">
           <div className="overflow-x-auto">
@@ -111,16 +139,19 @@ export default function ExchangeRatesPage() {
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Code</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Currency</th>
                   <th className="text-right py-3 px-4 font-semibold text-gray-700">Rate (1 USD)</th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-700">100 USD</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-700">100 USD =</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-700">1000 USD =</th>
                 </tr>
               </thead>
               <tbody>
                 {rates.map((rate) => {
                   const currency = CURRENCIES.find(c => c.code === rate.currency_code)
                   return (
-                    <tr key={rate.currency_code} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={rate.currency_code} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-4">
-                        <Badge variant="outline" className="font-mono">{rate.currency_code}</Badge>
+                        <Badge variant="outline" className="font-mono font-semibold">
+                          {rate.currency_code}
+                        </Badge>
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-medium text-gray-900">{rate.currency_name}</div>
@@ -130,24 +161,34 @@ export default function ExchangeRatesPage() {
                         {rate.rate.toFixed(4)}
                       </td>
                       <td className="py-3 px-4 text-right font-semibold text-blue-600">
-                        {(100 * rate.rate).toFixed(2)} {currency?.symbol}
+                        {(100 * rate.rate).toFixed(2)} <span className="text-gray-500">{currency?.symbol}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-semibold text-indigo-600">
+                        {(1000 * rate.rate).toFixed(2)} <span className="text-gray-500">{currency?.symbol}</span>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+            
+            {rates.length === 0 && (
+              <div className="text-center py-12 text-gray-500">
+                No exchange rates available
+              </div>
+            )}
           </div>
         </Card>
 
-        <div className="mt-6 p-6 bg-white rounded-lg border shadow-sm">
-          <h3 className="font-semibold text-gray-900 mb-2">About</h3>
-          <ul className="text-sm text-gray-600 space-y-1">
-            <li>• Updated daily at 00:00 UTC</li>
-            <li>• Source: Frankfurter.app (ECB)</li>
-            <li>• Top 20 liquid currencies</li>
+        <Card className="p-6 mt-6 bg-blue-50 border-blue-200">
+          <h3 className="font-semibold text-blue-900 mb-2">About Exchange Rates</h3>
+          <ul className="text-sm text-blue-800 space-y-1">
+            <li>• Data Source: Frankfurter.app (European Central Bank)</li>
+            <li>• Updates: Automatically daily at 00:00 UTC via Vercel Cron</li>
+            <li>• Coverage: Top 20 most liquid world currencies</li>
+            <li>• Base Currency: United States Dollar (USD)</li>
           </ul>
-        </div>
+        </Card>
       </div>
     </div>
   )
