@@ -3,21 +3,37 @@
 
 import { Pool } from 'pg'
 
+// Parse DATABASE_URL and extract components to force IPv4
+function createPool(databaseUrl: string) {
+  const isLocalhost = databaseUrl.includes('localhost')
+  
+  // Parse the connection URL
+  const url = new URL(databaseUrl)
+  
+  return new Pool({
+    user: url.username,
+    password: url.password,
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1), // Remove leading slash
+    ssl: isLocalhost
+      ? false
+      : {
+          rejectUnauthorized: false,
+        },
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    // Force IPv4 by setting address family
+    // @ts-ignore - family option exists but not in types
+    family: 4,
+    application_name: 'treasuryx',
+  })
+}
+
 // Only initialize pool if DATABASE_URL is provided
 const pool = process.env.DATABASE_URL
-  ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL.includes('localhost')
-        ? false
-        : {
-            rejectUnauthorized: false,
-          },
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-      // Options for pgBouncer/Supabase pooler compatibility
-      application_name: 'treasuryx',
-    })
+  ? createPool(process.env.DATABASE_URL)
   : null
 
 export async function query(text: string, params?: any[]) {
