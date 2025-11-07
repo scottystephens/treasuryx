@@ -3,11 +3,27 @@
 
 import { Pool } from 'pg'
 
-// Parse DATABASE_URL and extract components to force IPv4
+// Parse DATABASE_URL and extract components
 function createPool(databaseUrl: string) {
   const isLocalhost = databaseUrl.includes('localhost')
+  const isPgBouncer = databaseUrl.includes('pgbouncer=true') || databaseUrl.includes('6543')
   
-  // Parse the connection URL
+  // For pgBouncer/pooler, use connectionString directly
+  // For direct connections, parse and configure
+  if (isPgBouncer) {
+    return new Pool({
+      connectionString: databaseUrl,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+      max: 10, // Lower max for pooler
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+      application_name: 'treasuryx',
+    })
+  }
+  
+  // Direct connection - parse URL to force IPv4
   const url = new URL(databaseUrl)
   
   return new Pool({
@@ -15,7 +31,7 @@ function createPool(databaseUrl: string) {
     password: url.password,
     host: url.hostname,
     port: parseInt(url.port) || 5432,
-    database: url.pathname.slice(1), // Remove leading slash
+    database: url.pathname.slice(1),
     ssl: isLocalhost
       ? false
       : {
@@ -24,9 +40,6 @@ function createPool(databaseUrl: string) {
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
-    // Force IPv4 by setting address family
-    // @ts-ignore - family option exists but not in types
-    family: 4,
     application_name: 'treasuryx',
   })
 }
