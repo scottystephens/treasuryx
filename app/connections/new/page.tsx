@@ -293,24 +293,25 @@ export default function NewConnectionPage() {
           {/* Step Indicator (CSV only) */}
           {connectionType === 'csv' && step !== 'select-type' && (
             <div className="flex items-center justify-between mb-8">
-            {['upload', 'mapping', 'preview', 'results'].map((s, index) => (
-              <div key={s} className="flex items-center flex-1">
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold ${
-                    step === s
-                      ? 'bg-blue-600 text-white'
-                      : ['upload', 'mapping', 'preview'].indexOf(step) > index
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}
-                >
-                  {index + 1}
+              {['upload', 'mapping', 'preview', 'results'].map((s, index) => (
+                <div key={s} className="flex items-center flex-1">
+                  <div
+                    className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold ${
+                      step === s
+                        ? 'bg-blue-600 text-white'
+                        : ['upload', 'mapping', 'preview'].indexOf(step) > index
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {index + 1}
+                  </div>
+                  <span className="ml-2 text-sm font-medium capitalize">{s}</span>
+                  {index < 3 && <div className="flex-1 h-0.5 bg-gray-200 mx-4" />}
                 </div>
-                <span className="ml-2 text-sm font-medium capitalize">{s}</span>
-                {index < 3 && <div className="flex-1 h-0.5 bg-gray-200 mx-4" />}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Step 1: Upload - CSV */}
           {step === 'upload' && connectionType === 'csv' && (
@@ -362,7 +363,7 @@ export default function NewConnectionPage() {
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Connect Bunq Account</h2>
                 <p className="text-muted-foreground">
-                  You'll be redirected to Bunq to authorize access to your accounts
+                  You&apos;ll be redirected to Bunq to authorize access to your accounts
                 </p>
               </div>
 
@@ -409,10 +410,10 @@ export default function NewConnectionPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <h3 className="font-semibold text-blue-900 mb-2">What happens next?</h3>
                 <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                  <li>You'll be redirected to Bunq's secure login page</li>
+                  <li>You&apos;ll be redirected to Bunq&apos;s secure login page</li>
                   <li>Log in with your Bunq credentials</li>
                   <li>Authorize Stratifi to access your account data (read-only)</li>
-                  <li>You'll be redirected back to view your connected accounts</li>
+                  <li>You&apos;ll be redirected back to view your connected accounts</li>
                 </ol>
               </div>
 

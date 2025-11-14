@@ -346,6 +346,8 @@ export async function createConnection(connection: {
   account_id?: string
   import_mode?: string
   created_by: string
+  provider?: string
+  oauth_state?: string
 }) {
   try {
     const { data, error } = await supabase
@@ -372,6 +374,7 @@ export async function updateConnection(
     last_sync_at: string
     next_sync_at: string
     import_mode: string
+    last_error: string
   }>
 ) {
   try {
