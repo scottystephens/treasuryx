@@ -214,7 +214,7 @@ export default function NewConnectionPage() {
                   id="file-upload"
                 />
                 <label htmlFor="file-upload">
-                  <Button as Font="span" className="cursor-pointer">
+                  <Button type="button" className="cursor-pointer">
                     <FileText className="h-4 w-4 mr-2" />
                     Choose File
                   </Button>

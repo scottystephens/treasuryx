@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 
