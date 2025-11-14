@@ -192,30 +192,34 @@ export async function exchangeCodeForToken(
     throw new Error('Bunq configuration is incomplete');
   }
   
+  // Try standard OAuth2: Basic Auth for client credentials + form body for params
+  const basicAuth = Buffer.from(
+    `${BUNQ_CONFIG.clientId}:${BUNQ_CONFIG.clientSecret}`
+  ).toString('base64');
+  
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code: code,
     redirect_uri: BUNQ_CONFIG.redirectUri,
-    client_id: BUNQ_CONFIG.clientId,
-    client_secret: BUNQ_CONFIG.clientSecret,
   });
-  
-  // Bunq wants parameters as query string (unusual but confirmed by error message)
-  const tokenUrl = `${BUNQ_CONFIG.tokenUrl}?${params.toString()}`;
   
   console.log('🔄 Exchanging code for token...');
   console.log('Token URL:', BUNQ_CONFIG.tokenUrl);
   console.log('Redirect URI:', BUNQ_CONFIG.redirectUri);
   console.log('Client ID:', BUNQ_CONFIG.clientId?.substring(0, 20) + '...');
   console.log('Code:', code?.substring(0, 20) + '...');
+  console.log('Using Basic Auth for client credentials');
   
   try {
-    // Bunq's non-standard OAuth: POST with parameters in query string
-    const response = await fetch(tokenUrl, {
+    // Standard OAuth2: POST with Basic Auth + form-encoded body
+    const response = await fetch(BUNQ_CONFIG.tokenUrl, {
       method: 'POST',
       headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Cache-Control': 'no-cache',
       },
+      body: params.toString(),
     });
     
     console.log('Response status:', response.status);
