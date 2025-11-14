@@ -8,7 +8,9 @@ Comprehensive documentation for the TreasuryX treasury management platform.
 docs/
 ├── architecture/        # System architecture and design docs
 ├── guides/             # How-to guides and feature documentation
-└── README.md           # This file
+├── archive/            # Historical/obsolete documentation
+├── README.md           # This file
+└── REORGANIZATION.md   # Repository reorganization guide
 ```
 
 ---
@@ -23,6 +25,11 @@ System design and architectural decisions:
   - Data flow and transformation
   - Security and compliance considerations
 
+- **MULTI_TENANT_SYSTEM.md** - Multi-tenant architecture
+  - Tenant isolation via RLS
+  - User-tenant relationships
+  - Role-based access control
+
 ---
 
 ## 📚 Guides (`guides/`)
@@ -30,16 +37,23 @@ System design and architectural decisions:
 Feature documentation and how-to guides:
 
 - **CSV_INGESTION_COMPLETE.md** - CSV import system documentation
-  - Features and capabilities
-  - Setup instructions
-  - Configuration options
-  - Troubleshooting
-
 - **DEPLOYMENT_SUMMARY.md** - Production deployment guide
-  - What's deployed
-  - Test data information
-  - Testing instructions
-  - Support information
+- **DATABASE_SETUP.md** - Database setup instructions
+- **EXCHANGE_RATES.md** - Exchange rates feature
+- **PRODUCTION_DEPLOYMENT.md** - Production deployment checklist
+- **DEPLOYMENT.md** - General deployment guide
+
+---
+
+## 📦 Archive (`archive/`)
+
+Historical documentation (for reference):
+
+- **COMPARISON.md** - Early platform comparisons
+- **OVERVIEW.md** - Original project overview
+- **PROJECT_SUMMARY.md** - Early project summary
+- **QUICKSTART.md** - Original quick start (see main README instead)
+- **RATES_PAGE_FIX.md** - Historical bug fix documentation
 
 ---
 

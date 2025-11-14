@@ -599,6 +599,7 @@ export async function createAuditLog(log: {
 
 export interface Account {
   id?: string
+  account_id?: string // Primary key in database
   tenant_id: string
   account_name: string
   account_number?: string

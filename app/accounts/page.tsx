@@ -167,7 +167,7 @@ export default function AccountsPage() {
           {!loading && accounts.length > 0 && (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {accounts.map((account) => (
-                <Card key={account.id} className="p-6 hover:shadow-lg transition-shadow">
+                <Card key={account.account_id || account.id} className="p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-100 rounded-lg">
@@ -185,8 +185,8 @@ export default function AccountsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(account.id!)}
-                      disabled={deleting === account.id}
+                      onClick={() => handleDelete(account.account_id || account.id!)}
+                      disabled={deleting === (account.account_id || account.id)}
                     >
                       <Trash2 className="h-4 w-4 text-red-600" />
                     </Button>
@@ -238,7 +238,7 @@ export default function AccountsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/accounts/${account.id}`)}
+                      onClick={() => router.push(`/accounts/${account.account_id || account.id}`)}
                       className="flex-1"
                     >
                       <Edit className="h-4 w-4 mr-1" />
@@ -247,7 +247,7 @@ export default function AccountsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/accounts/${account.id}/transactions`)}
+                      onClick={() => router.push(`/accounts/${account.account_id || account.id}/transactions`)}
                       className="flex-1"
                     >
                       <TrendingUp className="h-4 w-4 mr-1" />

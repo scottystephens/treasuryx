@@ -440,7 +440,7 @@ export default function NewConnectionPage() {
                   >
                     <option value="">-- None (Import without account link) --</option>
                     {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
+                      <option key={account.account_id || account.id} value={account.account_id || account.id}>
                         {account.account_name} ({account.currency || 'USD'})
                         {account.account_number && ` - ••••${account.account_number.slice(-4)}`}
                       </option>
