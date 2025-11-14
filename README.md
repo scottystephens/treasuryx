@@ -13,7 +13,7 @@ A modern, production-ready **multi-tenant SaaS platform** for intelligent treasu
 
 ## 🎯 Overview
 
-TreasuryX is a comprehensive treasury management system built for **multi-tenant SaaS** operations with:
+Stratifi is a comprehensive **Strategic Financial Intelligence** platform built for **multi-tenant SaaS** operations with:
 
 - ✅ **Multi-tenant architecture** with row-level security
 - ✅ **Bank account management** with 30+ industry-standard fields
