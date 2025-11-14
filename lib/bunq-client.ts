@@ -200,6 +200,12 @@ export async function exchangeCodeForToken(
     client_secret: BUNQ_CONFIG.clientSecret,
   });
   
+  console.log('🔄 Exchanging code for token...');
+  console.log('Token URL:', BUNQ_CONFIG.tokenUrl);
+  console.log('Redirect URI:', BUNQ_CONFIG.redirectUri);
+  console.log('Client ID:', BUNQ_CONFIG.clientId?.substring(0, 20) + '...');
+  console.log('Body params:', params.toString());
+  
   try {
     const response = await fetch(BUNQ_CONFIG.tokenUrl, {
       method: 'POST',
@@ -210,17 +216,30 @@ export async function exchangeCodeForToken(
       body: params.toString(),
     });
     
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    
     if (!response.ok) {
-      const error = await response.json();
+      const errorText = await response.text();
+      console.error('Error response body:', errorText);
+      
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { error_description: errorText };
+      }
+      
       throw new Error(
         `Bunq token exchange failed: ${error.error_description || response.statusText}`
       );
     }
     
     const data: BunqOAuthTokenResponse = await response.json();
+    console.log('✅ Token exchange successful');
     return data;
   } catch (error) {
-    console.error('Error exchanging Bunq authorization code:', error);
+    console.error('❌ Error exchanging Bunq authorization code:', error);
     throw error;
   }
 }
