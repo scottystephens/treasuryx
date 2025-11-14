@@ -8,15 +8,18 @@ import { Navigation } from '@/components/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { BunqConnectButton } from '@/components/bunq-connect-button';
+import { Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2, AlertCircle, Building2, FileSpreadsheet } from 'lucide-react';
 import type { Account } from '@/lib/supabase';
 
-// Step 1: File Upload
-// Step 2: Column Mapping
-// Step 3: Preview & Config
+// Step 0: Connection Type Selection
+// Step 1: File Upload (CSV) or Bunq OAuth
+// Step 2: Column Mapping (CSV only)
+// Step 3: Preview & Config (CSV only)
 // Step 4: Import & Results
 
-type Step = 'upload' | 'mapping' | 'preview' | 'results';
+type ConnectionType = 'csv' | 'bunq' | null;
+type Step = 'select-type' | 'upload' | 'mapping' | 'preview' | 'results';
 
 interface UploadedFile {
   fileName: string;
@@ -25,6 +28,11 @@ interface UploadedFile {
   columns: string[];
   sampleRows: Record<string, any>[];
   suggestedMapping: Record<string, string>;
+  detectedDataType?: {
+    dataType: 'transactions' | 'statements' | 'unknown';
+    confidence: 'high' | 'medium' | 'low';
+    reason: string;
+  };
 }
 
 interface ParsedData {
@@ -43,7 +51,8 @@ export default function NewConnectionPage() {
   const { currentTenant } = useTenant();
   const { user } = useAuth();
   
-  const [step, setStep] = useState<Step>('upload');
+  const [connectionType, setConnectionType] = useState<ConnectionType>(null);
+  const [step, setStep] = useState<Step>('select-type');
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
@@ -224,14 +233,66 @@ export default function NewConnectionPage() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Connections
             </Button>
-            <h1 className="text-3xl font-bold">Import CSV Data</h1>
+            <h1 className="text-3xl font-bold">
+              {connectionType === 'csv' ? 'Import CSV Data' : 'New Connection'}
+            </h1>
             <p className="text-muted-foreground mt-2">
-              Upload and configure your transaction data
+              {connectionType === 'csv'
+                ? 'Upload and configure your transaction data'
+                : connectionType === 'bunq'
+                ? 'Connect your Bunq banking account'
+                : 'Choose how you want to connect your data'}
             </p>
           </div>
 
-          {/* Step Indicator */}
-          <div className="flex items-center justify-between mb-8">
+          {/* Step 0: Select Connection Type */}
+          {step === 'select-type' && (
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card
+                className="p-8 cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-500"
+                onClick={() => {
+                  setConnectionType('csv');
+                  setStep('upload');
+                }}
+              >
+                <div className="text-center">
+                  <div className="flex justify-center mb-4">
+                    <FileSpreadsheet className="h-16 w-16 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-semibold mb-2">CSV Import</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Upload a CSV file with your bank statements or transactions
+                  </p>
+                  <Badge variant="secondary">Manual Upload</Badge>
+                </div>
+              </Card>
+
+              <Card
+                className="p-8 cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-blue-500"
+                onClick={() => {
+                  setConnectionType('bunq');
+                  setStep('upload');
+                }}
+              >
+                <div className="text-center">
+                  <div className="flex justify-center mb-4">
+                    <Building2 className="h-16 w-16 text-orange-600" />
+                  </div>
+                  <h2 className="text-2xl font-semibold mb-2">Bunq Banking</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Connect your Bunq account for automatic transaction sync
+                  </p>
+                  <Badge className="bg-orange-100 text-orange-800">
+                    OAuth Integration
+                  </Badge>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Step Indicator (CSV only) */}
+          {connectionType === 'csv' && step !== 'select-type' && (
+            <div className="flex items-center justify-between mb-8">
             {['upload', 'mapping', 'preview', 'results'].map((s, index) => (
               <div key={s} className="flex items-center flex-1">
                 <div
@@ -251,8 +312,8 @@ export default function NewConnectionPage() {
             ))}
           </div>
 
-          {/* Step 1: Upload */}
-          {step === 'upload' && (
+          {/* Step 1: Upload - CSV */}
+          {step === 'upload' && connectionType === 'csv' && (
             <Card className="p-8">
               <div className="text-center">
                 <div className="flex justify-center mb-4">
@@ -276,6 +337,109 @@ export default function NewConnectionPage() {
                   <FileText className="h-4 w-4" />
                   Choose File
                 </label>
+                <div className="mt-4">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setConnectionType(null);
+                      setStep('select-type');
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Choose Different Connection Type
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Step 1: Connect - Bunq */}
+          {step === 'upload' && connectionType === 'bunq' && (
+            <Card className="p-8 max-w-2xl mx-auto">
+              <div className="text-center mb-6">
+                <div className="flex justify-center mb-4">
+                  <Building2 className="h-16 w-16 text-orange-600" />
+                </div>
+                <h2 className="text-2xl font-semibold mb-2">Connect Bunq Account</h2>
+                <p className="text-muted-foreground">
+                  You'll be redirected to Bunq to authorize access to your accounts
+                </p>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block font-medium mb-2">Connection Name</label>
+                  <input
+                    type="text"
+                    value={connectionName}
+                    onChange={(e) => setConnectionName(e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="e.g., My Bunq Business Account"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium mb-2">
+                    Link to Account (Optional)
+                  </label>
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => setSelectedAccountId(e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    disabled={loadingAccounts}
+                  >
+                    <option value="">-- Auto-create accounts from Bunq --</option>
+                    {accounts.map((account) => (
+                      <option
+                        key={account.account_id || account.id}
+                        value={account.account_id || account.id}
+                      >
+                        {account.account_name} ({account.currency || 'USD'})
+                        {account.account_number &&
+                          ` - ••••${account.account_number.slice(-4)}`}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    We recommend auto-creating accounts from your Bunq data
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold text-blue-900 mb-2">What happens next?</h3>
+                <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                  <li>You'll be redirected to Bunq's secure login page</li>
+                  <li>Log in with your Bunq credentials</li>
+                  <li>Authorize Stratifi to access your account data (read-only)</li>
+                  <li>You'll be redirected back to view your connected accounts</li>
+                </ol>
+              </div>
+
+              {currentTenant && (
+                <BunqConnectButton
+                  tenantId={currentTenant.id}
+                  connectionName={connectionName}
+                  accountId={selectedAccountId || undefined}
+                />
+              )}
+
+              <div className="mt-4 text-center">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setConnectionType(null);
+                    setStep('select-type');
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Choose Different Connection Type
+                </Button>
+              </div>
+
+              <div className="mt-6 text-xs text-muted-foreground text-center">
+                <p>🔒 Your credentials are never shared with Stratifi</p>
+                <p>We use OAuth for secure, read-only access to your data</p>
               </div>
             </Card>
           )}
@@ -287,6 +451,55 @@ export default function NewConnectionPage() {
               <p className="text-muted-foreground mb-6">
                 Match your CSV columns to transaction fields
               </p>
+
+              {/* Data Type Detection Result */}
+              {uploadedFile.detectedDataType && (
+                <div className={`p-4 rounded-lg mb-6 ${
+                  uploadedFile.detectedDataType.confidence === 'high' 
+                    ? 'bg-green-50 border border-green-200'
+                    : uploadedFile.detectedDataType.confidence === 'medium'
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'bg-yellow-50 border border-yellow-200'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-1">
+                      {uploadedFile.detectedDataType.dataType === 'transactions' ? '💰' : 
+                       uploadedFile.detectedDataType.dataType === 'statements' ? '📊' : '❓'}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold">
+                          Detected: {uploadedFile.detectedDataType.dataType === 'transactions' ? 'Transaction Data' : 
+                                   uploadedFile.detectedDataType.dataType === 'statements' ? 'Statement Data' : 
+                                   'Unknown Data Type'}
+                        </span>
+                        <Badge className={
+                          uploadedFile.detectedDataType.confidence === 'high' 
+                            ? 'bg-green-100 text-green-800'
+                            : uploadedFile.detectedDataType.confidence === 'medium'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }>
+                          {uploadedFile.detectedDataType.confidence} confidence
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {uploadedFile.detectedDataType.reason}
+                      </p>
+                      {uploadedFile.detectedDataType.dataType === 'statements' && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          💡 Statement data will be imported to track daily balances and summaries.
+                        </p>
+                      )}
+                      {uploadedFile.detectedDataType.dataType === 'transactions' && (
+                        <p className="text-xs text-green-600 mt-2">
+                          💡 Transaction data will be imported as individual transaction records.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4 mb-6">
                 {/* Required mappings */}
@@ -366,7 +579,13 @@ export default function NewConnectionPage() {
               </div>
 
               <div className="flex justify-between mt-6">
-                <Button variant="outline" onClick={() => setStep('upload')}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setStep('upload');
+                    setUploadedFile(null);
+                  }}
+                >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
@@ -520,7 +739,13 @@ export default function NewConnectionPage() {
               </div>
 
               <div className="flex justify-between mt-6">
-                <Button variant="outline" onClick={() => setStep('mapping')}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setStep('mapping');
+                    setParsedData(null);
+                  }}
+                >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
@@ -571,8 +796,19 @@ export default function NewConnectionPage() {
                 <Button variant="outline" onClick={() => router.push('/connections')}>
                   View Connections
                 </Button>
-                <Button onClick={() => window.location.reload()}>
-                  Import Another File
+                <Button
+                  onClick={() => {
+                    setStep('select-type');
+                    setConnectionType(null);
+                    setUploadedFile(null);
+                    setColumnMapping({});
+                    setParsedData(null);
+                    setImportResult(null);
+                    setConnectionName('');
+                    setSelectedAccountId('');
+                  }}
+                >
+                  Create Another Connection
                 </Button>
               </div>
             </Card>
