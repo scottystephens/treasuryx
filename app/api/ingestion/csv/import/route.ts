@@ -11,8 +11,8 @@ import {
   importTransactions,
   deleteTransactionsByConnection,
   createAuditLog,
+  supabase, // Use service role client
 } from '@/lib/supabase';
-import { createClient } from '@/lib/supabase-server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify user has access to this tenant by checking user_tenants table
-    const supabase = await createClient();
+    // Use service role client to bypass RLS
     
     console.log('🔍 Checking user_tenants for:', { userId, tenantId });
     
