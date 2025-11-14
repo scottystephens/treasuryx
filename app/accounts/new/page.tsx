@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Navigation } from '@/components/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 
 const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Checking Account' },
