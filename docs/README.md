@@ -66,7 +66,7 @@ Historical documentation (for reference):
 
 ### External Resources
 - [Supabase Dashboard](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik)
-- [Production App](https://stratifi-pi.vercel.app)
+- [Production App](https://stratifi.vercel.app)
 - [GitHub Repository](https://github.com/scottystephens/stratifi)
 
 ---

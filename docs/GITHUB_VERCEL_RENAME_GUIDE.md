@@ -65,8 +65,8 @@ git remote -v
 After renaming, your production URL options:
 
 **Option A - Keep current domain:**
-- URL stays: `https://treasuryx-pi.vercel.app`
-- Works fine, but name doesn't match
+- URL stays: `https://stratifi.vercel.app`
+- Works fine, matches project name
 
 **Option B - Use new auto-generated domain:**
 - New URL: `https://stratifi.vercel.app` (or `stratifi-xxxx.vercel.app`)
