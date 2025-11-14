@@ -128,8 +128,15 @@ export function validateBunqConfig(): boolean {
   const required = ['clientId', 'clientSecret', 'redirectUri'];
   const missing = required.filter(key => !BUNQ_CONFIG[key as keyof typeof BUNQ_CONFIG]);
   
+  console.log('🔍 Bunq Config Check:', {
+    clientId: BUNQ_CONFIG.clientId ? '✓ Set' : '✗ Missing',
+    clientSecret: BUNQ_CONFIG.clientSecret ? '✓ Set' : '✗ Missing',
+    redirectUri: BUNQ_CONFIG.redirectUri ? '✓ Set' : '✗ Missing',
+    environment: BUNQ_CONFIG.environment,
+  });
+  
   if (missing.length > 0) {
-    console.error(`Missing Bunq configuration: ${missing.join(', ')}`);
+    console.error(`❌ Missing Bunq configuration: ${missing.join(', ')}`);
     return false;
   }
   
@@ -144,8 +151,15 @@ export function validateBunqConfig(): boolean {
  * Generate OAuth authorization URL for user to grant access
  */
 export function getBunqAuthorizationUrl(state: string): string {
+  console.log('🔗 getBunqAuthorizationUrl called with state:', state);
+  
   if (!validateBunqConfig()) {
-    throw new Error('Bunq configuration is incomplete');
+    const missingVars = [];
+    if (!process.env.BUNQ_CLIENT_ID) missingVars.push('BUNQ_CLIENT_ID');
+    if (!process.env.BUNQ_CLIENT_SECRET) missingVars.push('BUNQ_CLIENT_SECRET');
+    if (!process.env.BUNQ_REDIRECT_URI) missingVars.push('BUNQ_REDIRECT_URI');
+    
+    throw new Error(`Bunq configuration is incomplete. Missing: ${missingVars.join(', ')}`);
   }
   
   const params = new URLSearchParams({
@@ -155,7 +169,10 @@ export function getBunqAuthorizationUrl(state: string): string {
     state: state,
   });
   
-  return `${BUNQ_CONFIG.authorizeUrl}?${params.toString()}`;
+  const url = `${BUNQ_CONFIG.authorizeUrl}?${params.toString()}`;
+  console.log('✅ Generated OAuth URL');
+  
+  return url;
 }
 
 /**

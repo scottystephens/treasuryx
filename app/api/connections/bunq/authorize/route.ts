@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { tenantId, connectionName, accountId } = body;
 
+    console.log('📋 Request body:', { tenantId, connectionName, accountId });
+
     if (!tenantId || !connectionName) {
       return NextResponse.json(
         { error: 'Tenant ID and connection name are required' },
@@ -62,9 +64,11 @@ export async function POST(req: NextRequest) {
       .eq('tenant_id', tenantId)
       .single();
 
+    console.log('🔐 Tenant access check:', { userTenants, tenantError });
+
     if (tenantError || !userTenants) {
       return NextResponse.json(
-        { error: 'You do not have access to this tenant' },
+        { error: 'You do not have access to this tenant', details: tenantError?.message },
         { status: 403 }
       );
     }
@@ -77,27 +81,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log('🔑 Generating OAuth state...');
     // Generate OAuth state for security
     const oauthState = generateOAuthState();
 
+    console.log('📝 Creating connection record...');
     // Create connection record
-    const connection = await createConnection({
-      tenant_id: tenantId,
-      name: connectionName,
-      connection_type: 'bunq_oauth',
-      provider: 'bunq',
-      account_id: accountId || null,
-      import_mode: 'incremental',
-      config: {
-        environment: process.env.BUNQ_ENVIRONMENT || 'sandbox',
-        created_at: new Date().toISOString(),
-      },
-      created_by: user.id,
-      oauth_state: oauthState,
-    });
+    let connection;
+    try {
+      connection = await createConnection({
+        tenant_id: tenantId,
+        name: connectionName,
+        connection_type: 'bunq_oauth',
+        provider: 'bunq',
+        account_id: accountId || null,
+        import_mode: 'incremental',
+        config: {
+          environment: process.env.BUNQ_ENVIRONMENT || 'sandbox',
+          created_at: new Date().toISOString(),
+        },
+        created_by: user.id,
+        oauth_state: oauthState,
+      });
+      console.log('✅ Connection created:', connection.id);
+    } catch (connError) {
+      console.error('❌ Failed to create connection:', connError);
+      return NextResponse.json(
+        { 
+          error: 'Failed to create connection',
+          details: connError instanceof Error ? connError.message : 'Unknown error',
+        },
+        { status: 500 }
+      );
+    }
 
+    console.log('🔗 Generating Bunq authorization URL...');
     // Generate Bunq authorization URL
-    const authorizationUrl = getBunqAuthorizationUrl(oauthState);
+    let authorizationUrl;
+    try {
+      authorizationUrl = getBunqAuthorizationUrl(oauthState);
+      console.log('✅ Authorization URL generated');
+    } catch (urlError) {
+      console.error('❌ Failed to generate authorization URL:', urlError);
+      return NextResponse.json(
+        { 
+          error: 'Failed to generate authorization URL',
+          details: urlError instanceof Error ? urlError.message : 'Unknown error',
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -106,10 +139,12 @@ export async function POST(req: NextRequest) {
       message: 'Connection created. Redirect user to authorization URL.',
     });
   } catch (error) {
-    console.error('Bunq authorization initiation error:', error);
+    console.error('❌ Bunq authorization initiation error:', error);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Failed to initiate Bunq authorization',
+        error: 'Failed to initiate Bunq authorization',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );
