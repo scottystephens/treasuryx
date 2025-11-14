@@ -200,6 +200,9 @@ export async function exchangeCodeForToken(
     client_secret: BUNQ_CONFIG.clientSecret,
   });
   
+  // Bunq wants parameters as query string (unusual but confirmed by error message)
+  const tokenUrl = `${BUNQ_CONFIG.tokenUrl}?${params.toString()}`;
+  
   console.log('🔄 Exchanging code for token...');
   console.log('Token URL:', BUNQ_CONFIG.tokenUrl);
   console.log('Redirect URI:', BUNQ_CONFIG.redirectUri);
@@ -207,14 +210,12 @@ export async function exchangeCodeForToken(
   console.log('Code:', code?.substring(0, 20) + '...');
   
   try {
-    // Standard OAuth2: POST with form-encoded body
-    const response = await fetch(BUNQ_CONFIG.tokenUrl, {
+    // Bunq's non-standard OAuth: POST with parameters in query string
+    const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
         'Cache-Control': 'no-cache',
       },
-      body: params.toString(),
     });
     
     console.log('Response status:', response.status);
