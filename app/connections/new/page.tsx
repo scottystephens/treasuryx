@@ -113,7 +113,7 @@ export default function NewConnectionPage() {
 
   // Step 3: Import
   async function handleImport() {
-    if (!uploadedFile || !currentTenant || !selectedAccountId || !user) {
+    if (!uploadedFile || !currentTenant || !user) {
       alert('Missing required information. Please ensure you are logged in.');
       return;
     }
@@ -123,7 +123,7 @@ export default function NewConnectionPage() {
       userEmail: user.email,
       tenantId: currentTenant.id,
       tenantName: currentTenant.name,
-      accountId: selectedAccountId,
+      accountId: selectedAccountId || 'none',
       connectionName,
       importMode,
     });
@@ -154,7 +154,8 @@ export default function NewConnectionPage() {
         setStep('results');
       } else {
         console.error('❌ Import failed:', data);
-        alert(`Import failed: ${data.error}\n\nDebug Info:\n${JSON.stringify(data.debug, null, 2)}`);
+        const debugInfo = data.debug || data.details || data.errorObject || 'No additional info';
+        alert(`Import failed: ${data.error}\n\nDetails: ${typeof debugInfo === 'string' ? debugInfo : JSON.stringify(debugInfo, null, 2)}`);
       }
     } catch (error) {
       console.error('Import error:', error);
@@ -402,17 +403,20 @@ export default function NewConnectionPage() {
                 </div>
 
                 <div>
-                  <label className="block font-medium mb-2">Link to Account</label>
+                  <label className="block font-medium mb-2">Link to Account (Optional)</label>
                   <select
                     value={selectedAccountId}
                     onChange={(e) => setSelectedAccountId(e.target.value)}
                     className="w-full border rounded px-3 py-2"
                   >
-                    <option value="">-- Select Account --</option>
+                    <option value="">-- None (Import without account link) --</option>
                     {/* TODO: Load accounts from API */}
                     <option value="dummy-account-1">Main Operating Account</option>
                     <option value="dummy-account-2">Savings Account</option>
                   </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You can link transactions to an account later
+                  </p>
                 </div>
 
                 <div>
@@ -480,7 +484,7 @@ export default function NewConnectionPage() {
                 </Button>
                 <Button
                   onClick={handleImport}
-                  disabled={importing || !connectionName || !selectedAccountId}
+                  disabled={importing || !connectionName}
                 >
                   {importing ? 'Importing...' : 'Import Transactions'}
                   <ArrowRight className="h-4 w-4 ml-2" />

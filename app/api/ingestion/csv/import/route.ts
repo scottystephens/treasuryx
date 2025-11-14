@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
       userId,
     });
 
-    // Validate required fields
-    if (!content || !columnMapping || !connectionName || !accountId || !tenantId || !userId) {
+    // Validate required fields (accountId is optional for now)
+    if (!content || !columnMapping || !connectionName || !tenantId || !userId) {
       console.error('Missing required fields:', {
         content: !!content,
         columnMapping: !!columnMapping,
@@ -50,10 +50,13 @@ export async function POST(req: NextRequest) {
         userId: !!userId,
       });
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields (need: content, columnMapping, connectionName, tenantId, userId)' },
         { status: 400 }
       );
     }
+    
+    // Normalize accountId (null if dummy or not provided)
+    const normalizedAccountId = (!accountId || accountId.startsWith('dummy-')) ? null : accountId;
 
     // Verify user has access to this tenant by checking user_tenants table
     // Use service role client to bypass RLS
@@ -103,6 +106,15 @@ export async function POST(req: NextRequest) {
     // Step 1: Create connection record
     let connection;
     try {
+      console.log('📝 Creating connection:', {
+        tenant_id: tenantId,
+        name: connectionName,
+        connection_type: 'csv',
+        account_id: normalizedAccountId,
+        import_mode: importMode || 'append',
+        created_by: userId,
+      });
+      
       connection = await createConnection({
         tenant_id: tenantId,
         name: connectionName,
@@ -111,14 +123,24 @@ export async function POST(req: NextRequest) {
           columnMapping,
           ...config,
         },
-        account_id: accountId,
+        account_id: normalizedAccountId,
         import_mode: importMode || 'append',
         created_by: userId,
       });
+      
+      console.log('✅ Connection created:', connection.id);
     } catch (error) {
-      console.error('Error creating connection:', error);
+      console.error('❌ Error creating connection:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown',
+        error: error,
+      });
       return NextResponse.json(
-        { error: 'Failed to create connection' },
+        { 
+          error: 'Failed to create connection',
+          details: error instanceof Error ? error.message : 'Unknown error',
+          errorObject: JSON.stringify(error, null, 2)
+        },
         { status: 500 }
       );
     }
@@ -188,7 +210,7 @@ export async function POST(req: NextRequest) {
       // Step 6: Transform parsed transactions to database format
       const transactionsToImport = parseResult.transactions.map((tx, index) => ({
         tenant_id: tenantId,
-        account_id: accountId,
+        account_id: normalizedAccountId, // Use normalized (nullable) account ID
         transaction_date: tx.date,
         amount: tx.amount,
         currency: 'USD', // TODO: Make configurable
