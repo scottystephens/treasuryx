@@ -1,0 +1,1264 @@
+# Stratifi - Cursor Rules
+
+## Project Overview
+
+Stratifi is a **Strategic Financial Intelligence Platform** - a production-ready multi-tenant SaaS platform for intelligent treasury management, bank account operations, and automated data ingestion.
+
+**Live Production:** https://stratifi.vercel.app
+
+### Core Features
+- Multi-tenant SaaS architecture with row-level security
+- Bank account management with 30+ industry-standard fields
+- CSV data ingestion with flexible column mapping
+- Multi-currency support (USD, EUR, GBP, etc.)
+- Transaction deduplication and reconciliation
+- Banking provider integrations (Bunq, with extensible architecture)
+- Exchange rate tracking and visualization
+- Full audit trail for compliance
+
+---
+
+## Tech Stack
+
+### Frontend
+- **Framework:** Next.js 14 (App Router) with TypeScript
+- **Styling:** Tailwind CSS
+- **UI Components:** Custom components + shadcn/ui patterns (Card, Button, Badge)
+- **Charts:** Recharts
+- **Icons:** Lucide React
+- **State Management:** React Context API (AuthProvider, TenantProvider)
+
+### Backend
+- **Database:** PostgreSQL via Supabase
+- **Authentication:** Supabase Auth (email/password)
+- **Authorization:** Row-Level Security (RLS) policies
+- **API:** Next.js API Routes (app/api/)
+- **File Parsing:** PapaParse (CSV)
+
+### Infrastructure
+- **Hosting:** Vercel
+- **Database:** Supabase (hosted PostgreSQL)
+- **Deployment:** Automatic from main branch
+
+---
+
+## Architecture Patterns
+
+### 1. Multi-Tenant System
+- **Tenant Isolation:** Row-Level Security (RLS) on all tenant-scoped tables
+- **Tenant Context:** Global TenantProvider manages current organization
+- **Role Hierarchy:** owner > admin > editor > viewer
+- **Database Pattern:** Single shared schema with `tenant_id` foreign keys
+
+**Always include tenant_id in queries for tenant-scoped tables:**
+```typescript
+const { currentTenant } = useTenant();
+const accounts = await supabase
+  .from('accounts')
+  .select('*')
+  .eq('tenant_id', currentTenant.id);
+```
+
+### 2. Row-Level Security (RLS)
+- All tenant-scoped tables MUST have RLS enabled
+- RLS policies automatically enforce tenant isolation
+- Never bypass RLS except with service role for admin operations
+- Trust the database to enforce security boundaries
+
+### 3. Authentication Pattern
+- Use `AuthProvider` for client-side auth state
+- Server-side: Use `lib/auth.ts` utilities for API routes
+- Protected routes: Check auth in page components
+- Session management: Automatic via Supabase
+
+### 4. Provider Pattern (Banking Integrations)
+- All banking providers extend `BankingProvider` abstract class
+- Standard interface for OAuth, accounts, transactions
+- Provider registry for dynamic loading
+- See `lib/banking-providers/` and `docs/guides/ADDING_NEW_BANKING_PROVIDERS.md`
+
+---
+
+## File Organization
+
+```
+app/                           # Next.js 14 App Router
+├── api/                       # API routes (server-side)
+│   ├── accounts/              # Account CRUD
+│   ├── banking/               # Banking provider integrations
+│   ├── connections/           # Connection management
+│   ├── ingestion/csv/         # CSV import
+│   └── transactions/          # Transaction operations
+├── [feature]/                 # Feature pages (dashboard, accounts, etc.)
+│   ├── page.tsx               # Page component
+│   └── layout.tsx             # Feature-specific layout (optional)
+└── layout.tsx                 # Root layout (providers, navigation)
+
+components/                    # Reusable React components
+├── ui/                        # Base UI components
+└── [feature-components].tsx   # Feature-specific components
+
+lib/                           # Core library code
+├── supabase.ts                # Database queries (service role)
+├── supabase-client.ts         # Client-side Supabase
+├── supabase-server.ts         # Server-side Supabase (API routes)
+├── auth.ts                    # Auth utilities
+├── auth-context.tsx           # Auth provider
+├── tenant-context.tsx         # Tenant provider
+├── banking-providers/         # Banking provider implementations
+└── parsers/                   # Data parsers (CSV, etc.)
+
+scripts/                       # Database and utility scripts
+├── migrations/                # SQL migrations (run in order)
+├── data-generation/           # Test data generation
+└── utilities/                 # Helper scripts
+
+docs/                          # Documentation
+├── architecture/              # System architecture docs
+└── guides/                    # Feature guides and how-tos
+```
+
+---
+
+## Coding Standards
+
+### TypeScript
+- **Always use TypeScript** - no plain JavaScript files
+- Define interfaces for all data structures
+- Use strict type checking
+- Avoid `any` - use `unknown` or proper types
+- Export types alongside implementations
+
+### React Components
+- Use functional components with hooks
+- Use client components (`'use client'`) only when necessary (interactivity, hooks)
+- Server components by default for better performance
+- Props: Define interface for component props
+- Naming: PascalCase for components, camelCase for functions/variables
+
+### API Routes
+- File location: `app/api/[feature]/route.ts`
+- Export named functions: `GET`, `POST`, `PUT`, `DELETE`
+- Always use `NextResponse` for responses
+- Validate input with proper error handling
+- Return consistent JSON structure
+
+**Standard API Response Pattern:**
+```typescript
+// Success
+return NextResponse.json({ data: result });
+
+// Error
+return NextResponse.json(
+  { error: 'Error message' },
+  { status: 400 }
+);
+```
+
+### Database Queries
+
+#### Client-Side (Pages/Components)
+```typescript
+import { createClient } from '@/lib/supabase-client';
+
+const supabase = createClient();
+const { data, error } = await supabase
+  .from('accounts')
+  .select('*')
+  .eq('tenant_id', currentTenant.id);
+```
+
+#### Server-Side (API Routes)
+```typescript
+import { createClient } from '@/lib/supabase-server';
+
+const supabase = createClient();
+// Use same pattern as client-side
+```
+
+#### Admin Operations (Service Role)
+```typescript
+import { supabase } from '@/lib/supabase';
+
+// Only for operations that need to bypass RLS
+const { data, error } = await supabase
+  .from('accounts')
+  .select('*')
+  .eq('id', accountId);
+```
+
+---
+
+## Important Patterns
+
+### 1. Tenant-Aware Queries
+Always filter by tenant_id for tenant-scoped tables:
+```typescript
+const { currentTenant } = useTenant();
+
+// Good
+const accounts = await supabase
+  .from('accounts')
+  .select('*')
+  .eq('tenant_id', currentTenant.id);
+
+// Bad - might expose other tenants' data
+const accounts = await supabase
+  .from('accounts')
+  .select('*');
+```
+
+### 2. Loading States
+Always show loading states for async operations:
+```typescript
+const [loading, setLoading] = useState(false);
+
+{loading ? (
+  <div>Loading...</div>
+) : (
+  <ContentComponent />
+)}
+```
+
+### 3. Error Handling
+```typescript
+try {
+  const result = await someOperation();
+  // Handle success
+} catch (error) {
+  console.error('Operation failed:', error);
+  // Show user-friendly error message
+  alert('Something went wrong. Please try again.');
+}
+```
+
+### 4. Permission Checks
+```typescript
+const { currentTenant, userRole } = useTenant();
+const canEdit = ['owner', 'admin'].includes(userRole);
+
+{canEdit ? (
+  <Button onClick={handleSave}>Save</Button>
+) : (
+  <p className="text-sm text-gray-500">
+    You don't have permission to edit
+  </p>
+)}
+```
+
+### 5. Form Validation
+- Validate on client-side before submitting
+- Re-validate on server-side in API routes
+- Show inline validation errors
+- Disable submit button during processing
+
+---
+
+## Database Guidelines
+
+### Tables Structure
+- **Tenant-scoped tables:** Include `tenant_id UUID REFERENCES tenants(id)`
+- **Shared tables:** No tenant_id (e.g., exchange_rates)
+- **Always include:** `created_at`, `updated_at` timestamps
+- **Use UUIDs** for primary keys (except lookup tables)
+
+### RLS Policies
+When creating new tenant-scoped tables:
+```sql
+-- Enable RLS
+ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+
+-- SELECT policy
+CREATE POLICY "Users can view their tenant's records"
+ON table_name FOR SELECT
+USING (
+  tenant_id IN (
+    SELECT tenant_id FROM user_tenants WHERE user_id = auth.uid()
+  )
+);
+
+-- INSERT policy
+CREATE POLICY "Users can insert records for their tenant"
+ON table_name FOR INSERT
+WITH CHECK (
+  tenant_id IN (
+    SELECT tenant_id FROM user_tenants WHERE user_id = auth.uid()
+  )
+);
+
+-- Similar for UPDATE and DELETE
+```
+
+### Migrations
+- Location: `scripts/migrations/`
+- Naming: `##-descriptive-name.sql` (e.g., `01-create-base-tables.sql`)
+- Run in numerical order
+- Always test in development first
+- Document breaking changes
+
+---
+
+## Banking Provider Integration
+
+### Adding New Providers
+1. Create provider class in `lib/banking-providers/`
+2. Extend `BankingProvider` abstract class
+3. Implement all required methods (OAuth, fetchAccounts, fetchTransactions)
+4. Register in `provider-registry.ts`
+5. Add environment variables
+6. Add provider logo to `public/logos/`
+7. Test thoroughly
+
+### Provider Implementation Checklist
+- [ ] OAuth flow (or API key auth)
+- [ ] Token refresh mechanism
+- [ ] Fetch accounts
+- [ ] Fetch transactions with pagination
+- [ ] Map account types to standard format
+- [ ] Error handling and user-friendly messages
+- [ ] Test connection method
+- [ ] Documentation
+
+See: `docs/guides/ADDING_NEW_BANKING_PROVIDERS.md`
+
+---
+
+## Common Workflows
+
+### Creating a New Feature Page
+1. Create directory in `app/[feature]/`
+2. Add `page.tsx` with page component
+3. Add `layout.tsx` if custom layout needed
+4. Use TenantProvider to access current tenant
+5. Fetch data with tenant_id filter
+6. Add navigation link in `components/navigation.tsx`
+
+### Adding a New API Endpoint
+1. Create `app/api/[feature]/route.ts`
+2. Export HTTP method functions (GET, POST, etc.)
+3. Validate authentication
+4. Validate tenant access
+5. Process request
+6. Return NextResponse with JSON
+
+### CSV Import Flow
+1. User uploads CSV to `/connections/new`
+2. Parse with PapaParse (see `lib/parsers/csv-parser.ts`)
+3. Auto-detect columns
+4. Map columns to standard fields
+5. Preview data
+6. Save to database with audit trail
+
+---
+
+## Security Best Practices
+
+### Always
+- ✅ Use RLS for tenant isolation
+- ✅ Validate authentication in API routes
+- ✅ Check permissions before operations
+- ✅ Sanitize user input
+- ✅ Use parameterized queries (Supabase does this)
+- ✅ Store secrets in environment variables
+- ✅ Never log sensitive data (tokens, passwords)
+
+### Never
+- ❌ Bypass RLS without good reason
+- ❌ Trust client-side validation alone
+- ❌ Expose service role key to client
+- ❌ Return raw error messages to users
+- ❌ Hard-code credentials
+- ❌ Query without tenant_id filter
+
+---
+
+## Testing
+
+### Manual Testing
+- Use test credentials: test@treasuryx.com / test123456
+- Create test data with scripts in `scripts/data-generation/`
+- Test in multiple browsers
+- Test with different roles (owner, admin, editor, viewer)
+- Test tenant isolation (create multiple orgs)
+
+### Key Test Scenarios
+1. **Auth:** Signup, login, logout
+2. **Multi-tenant:** Create org, switch orgs, verify isolation
+3. **Team:** Invite, accept, role changes, remove
+4. **Accounts:** Create, edit, view, delete
+5. **CSV Import:** Upload, map, preview, import
+6. **Banking:** Connect provider, sync accounts, sync transactions
+7. **Permissions:** Test as different roles
+
+---
+
+## Environment Variables
+
+### Required
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Banking Providers (if using)
+BUNQ_CLIENT_ID=your_bunq_client_id
+BUNQ_CLIENT_SECRET=your_bunq_client_secret
+BUNQ_REDIRECT_URI=https://yourdomain.com/api/banking/bunq/callback
+BUNQ_ENVIRONMENT=SANDBOX # or PRODUCTION
+```
+
+### Development
+- Store in `.env.local` (gitignored)
+- Never commit secrets to repository
+- Use sandbox/test credentials
+
+### Production
+- Set in Vercel dashboard
+- Use production credentials
+- Verify all required vars are set
+
+---
+
+## Styling Guidelines
+
+### Tailwind Classes
+- Use Tailwind utility classes
+- Group related utilities (e.g., `flex items-center gap-2`)
+- Use responsive modifiers: `md:flex-row`
+- Use color system consistently: `bg-blue-600`, `text-gray-700`
+
+### Layout Patterns
+```typescript
+// Page wrapper
+<div className="min-h-screen bg-gray-50">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {/* Content */}
+  </div>
+</div>
+
+// Card pattern
+<div className="bg-white rounded-lg shadow p-6">
+  {/* Card content */}
+</div>
+
+// Button primary
+<button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+  Action
+</button>
+```
+
+---
+
+## Naming Conventions
+
+### Files
+- **Components:** PascalCase (e.g., `AccountCard.tsx`)
+- **Utilities:** kebab-case (e.g., `csv-parser.ts`)
+- **Pages:** lowercase (e.g., `page.tsx`)
+- **API routes:** `route.ts`
+
+### Variables/Functions
+- **Variables:** camelCase (e.g., `currentTenant`)
+- **Functions:** camelCase (e.g., `fetchAccounts`)
+- **Constants:** UPPER_SNAKE_CASE (e.g., `MAX_FILE_SIZE`)
+- **Types/Interfaces:** PascalCase (e.g., `Account`, `Transaction`)
+
+### Database
+- **Tables:** lowercase, plural (e.g., `accounts`, `transactions`)
+- **Columns:** lowercase, snake_case (e.g., `tenant_id`, `created_at`)
+- **Indexes:** `idx_tablename_columnname`
+- **Foreign keys:** `fk_tablename_columnname`
+
+---
+
+## Key Files Reference
+
+### Core Configuration
+- `next.config.js` - Next.js configuration
+- `tailwind.config.js` - Tailwind CSS configuration
+- `tsconfig.json` - TypeScript configuration
+- `middleware.ts` - Next.js middleware (auth, redirects)
+
+### Database
+- `lib/supabase.ts` - Service role client (admin operations)
+- `lib/supabase-client.ts` - Client-side Supabase
+- `lib/supabase-server.ts` - Server-side Supabase (API routes)
+- `scripts/migrations/` - SQL migrations
+
+### Authentication
+- `lib/auth.ts` - Server-side auth utilities
+- `lib/auth-context.tsx` - Client-side auth provider
+- `app/login/page.tsx` - Login page
+- `app/signup/page.tsx` - Signup page
+
+### Multi-Tenant
+- `lib/tenant-context.tsx` - Tenant provider
+- `app/settings/page.tsx` - Organization settings
+- `app/team/page.tsx` - Team management
+- `app/onboarding/page.tsx` - Create organization
+
+### Banking
+- `lib/banking-providers/base-provider.ts` - Provider interface
+- `lib/banking-providers/provider-registry.ts` - Provider registry
+- `lib/banking-providers/bunq-provider.ts` - Bunq implementation
+- `app/api/banking/` - Banking API routes
+
+### Data Ingestion
+- `lib/parsers/csv-parser.ts` - CSV parsing engine
+- `app/api/ingestion/csv/` - CSV import APIs
+- `app/connections/` - Connection management UI
+
+---
+
+## Documentation
+
+### When Adding Features
+1. Update relevant docs in `docs/guides/`
+2. Add code comments for complex logic
+3. Update README.md if needed
+4. Document API endpoints (params, responses)
+5. Add examples for common use cases
+
+### Documentation Standards
+- Architecture docs → `docs/architecture/`
+- Feature guides → `docs/guides/`
+- Use UPPERCASE for major docs (e.g., `DATA_INGESTION_ARCHITECTURE.md`)
+- Include examples and code snippets
+- Keep docs in sync with code
+
+---
+
+## Common Commands
+
+```bash
+# Development
+npm run dev              # Start dev server (localhost:3000)
+npm run build            # Build for production
+npm run start            # Start production server
+npm run lint             # Run ESLint
+
+# Database
+npx tsx scripts/utilities/run-migration.ts  # Run migrations
+npx tsx scripts/data-generation/create-test-user.ts  # Create test user
+
+# Generate test data
+npx tsx scripts/data-generation/setup-test-user-org.ts
+npx tsx scripts/data-generation/create-test-accounts-v2.ts
+npx tsx scripts/data-generation/generate-bank-statements.ts
+```
+
+---
+
+## Working with Supabase Database
+
+### Project Information
+- **Project ID:** `vnuithaqtpgbwmdvtxik`
+- **Database URL:** `https://vnuithaqtpgbwmdvtxik.supabase.co`
+- **Dashboard:** `https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik`
+- **SQL Editor:** `https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new`
+
+### Environment Variables
+Required in `.env.local`:
+```env
+NEXT_PUBLIC_SUPABASE_URL="https://vnuithaqtpgbwmdvtxik.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.vnuithaqtpgbwmdvtxik.supabase.co:5432/postgres"
+```
+
+---
+
+### 🔴 CRITICAL: How to Run SQL Migrations
+
+**The ONLY reliable way to run SQL migrations on production Supabase is through the web dashboard.**
+
+#### Method 1: Supabase SQL Editor (Recommended)
+1. Go to: [Supabase SQL Editor](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new)
+2. Open the migration file from `scripts/migrations/`
+3. Copy the entire SQL content
+4. Paste into the SQL Editor
+5. Click **"Run"** (or press `Cmd/Ctrl + Enter`)
+6. Verify success message
+
+**Example:**
+```bash
+# To run migration 06:
+# 1. Open: scripts/migrations/06-add-bunq-oauth-support.sql
+# 2. Copy all contents
+# 3. Paste in SQL Editor: https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new
+# 4. Click Run
+```
+
+#### Method 2: TypeScript Scripts (For Data Operations)
+For data manipulation (NOT schema changes), use TypeScript scripts:
+
+```bash
+# Run data generation scripts
+npx tsx scripts/data-generation/create-test-user.ts
+npx tsx scripts/data-generation/setup-test-user-org.ts
+npx tsx scripts/data-generation/create-test-accounts-v2.ts
+
+# Run utility scripts
+npx tsx scripts/utilities/backfill-exchange-rates.ts
+npx tsx scripts/utilities/verify-test-user.ts
+```
+
+**These scripts use the Supabase client library** (`lib/supabase.ts`) with the service role key.
+
+#### ⚠️ Method 3: CLI (Currently Not Working)
+The Supabase CLI commands for remote execution are currently not functional in this environment due to connection issues. **DO NOT USE:**
+
+```bash
+# ❌ These do NOT work:
+# supabase db execute --file migration.sql
+# supabase db push
+# psql $DATABASE_URL < migration.sql
+```
+
+---
+
+### Running Database Queries from Code
+
+#### Option A: Using Supabase Client (Recommended)
+```typescript
+import { supabase } from '@/lib/supabase'
+
+// For SELECT queries
+const { data, error } = await supabase
+  .from('connections')
+  .select('*')
+  .eq('tenant_id', tenantId)
+
+// For INSERT queries
+const { data, error } = await supabase
+  .from('connections')
+  .insert({ ... })
+  .select()
+  .single()
+
+// For schema changes - USE SQL EDITOR INSTEAD
+// RPC functions like exec_sql() don't exist by default
+```
+
+#### Option B: Creating a Helper Function
+If you need to run raw SQL programmatically (rare), create:
+
+```sql
+-- Run this in SQL Editor first to create the function:
+CREATE OR REPLACE FUNCTION exec_sql(sql TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  result JSON;
+BEGIN
+  EXECUTE sql;
+  RETURN json_build_object('success', true);
+EXCEPTION WHEN OTHERS THEN
+  RETURN json_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+```
+
+Then use it:
+```typescript
+const { data, error } = await supabase
+  .rpc('exec_sql', { sql: 'ALTER TABLE connections ADD COLUMN IF NOT EXISTS oauth_state TEXT' })
+```
+
+---
+
+### Common Database Tasks
+
+#### 1. Adding a New Column
+**Always use SQL Editor for schema changes:**
+
+```sql
+-- Example: Add columns to existing table
+ALTER TABLE connections 
+ADD COLUMN IF NOT EXISTS oauth_state TEXT,
+ADD COLUMN IF NOT EXISTS provider TEXT,
+ADD COLUMN IF NOT EXISTS external_connection_id TEXT;
+```
+
+#### 2. Checking Table Schema
+```typescript
+// In a TypeScript script
+import { supabase } from '@/lib/supabase'
+
+const { data, error } = await supabase
+  .from('connections')
+  .select('*')
+  .limit(0)
+
+console.log('Columns:', data ? Object.keys(data[0] || {}) : 'N/A')
+```
+
+#### 3. Checking RLS Policies
+**Run in SQL Editor:**
+```sql
+SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename, policyname;
+```
+
+#### 4. Checking if RLS is Enabled
+```sql
+SELECT schemaname, tablename, rowsecurity
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY tablename;
+```
+
+#### 5. Viewing Table Structure
+```sql
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'connections'
+ORDER BY ordinal_position;
+```
+
+---
+
+### Migration Workflow
+
+#### Creating a New Migration
+1. **Create SQL file:** `scripts/migrations/##-descriptive-name.sql`
+   - Use sequential numbering (e.g., `08-add-new-feature.sql`)
+   - Include `IF NOT EXISTS` / `IF EXISTS` checks
+   - Add comments explaining purpose
+
+2. **Test locally first** (if possible)
+   - Use a test Supabase project or local instance
+
+3. **Run on production:**
+   - Open [Supabase SQL Editor](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new)
+   - Copy/paste migration SQL
+   - Execute and verify
+
+4. **Document in README:**
+   - Add to `scripts/README.md` with description
+   - Update `scripts/migrations/` list
+
+#### Migration Best Practices
+```sql
+-- ✅ Good: Safe, idempotent migrations
+CREATE TABLE IF NOT EXISTS new_table (...);
+ALTER TABLE existing_table ADD COLUMN IF NOT EXISTS new_column TEXT;
+CREATE INDEX IF NOT EXISTS idx_name ON table(column);
+
+-- ❌ Bad: Will fail if already exists
+CREATE TABLE new_table (...);
+ALTER TABLE existing_table ADD COLUMN new_column TEXT;
+CREATE INDEX idx_name ON table(column);
+
+-- ✅ Good: Use DO blocks for complex logic
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'connections' AND column_name = 'oauth_state'
+  ) THEN
+    ALTER TABLE connections ADD COLUMN oauth_state TEXT;
+    RAISE NOTICE 'Added oauth_state column';
+  ELSE
+    RAISE NOTICE 'oauth_state column already exists';
+  END IF;
+END $$;
+```
+
+---
+
+### Troubleshooting Database Issues
+
+#### Error: "Could not find column X"
+**Cause:** Column doesn't exist in the table
+**Fix:** Run ALTER TABLE in SQL Editor to add it
+
+#### Error: "Row-level security policy violation"
+**Cause:** RLS is enabled but no policy grants access
+**Fix:** Check and add appropriate RLS policies
+
+#### Error: "Could not find function exec_sql"
+**Cause:** The RPC function doesn't exist (it's not built-in)
+**Fix:** Use SQL Editor for schema changes, or create the function first
+
+#### Error: "Tenant or user not found"
+**Cause:** Incorrect database URL or credentials
+**Fix:** Verify environment variables, use web dashboard instead
+
+---
+
+### Quick Reference
+
+| Task | Method | Tool |
+|------|--------|------|
+| Schema changes (ALTER TABLE, CREATE TABLE) | SQL Editor | [Open Editor](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new) |
+| Data queries (SELECT, INSERT, UPDATE) | TypeScript | `npx tsx scripts/...` |
+| Check schema | SQL Editor | `\d table_name` or `information_schema.columns` |
+| View data | Table Editor | [Open Tables](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/editor) |
+| RLS policies | SQL Editor | `SELECT * FROM pg_policies` |
+| Test data generation | TypeScript | `npx tsx scripts/data-generation/...` |
+
+---
+
+### Example: Complete Migration Process
+
+```bash
+# 1. Create migration file
+cat > scripts/migrations/08-add-oauth-columns.sql << 'EOF'
+-- Add OAuth support to connections table
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'connections' AND column_name = 'oauth_state'
+  ) THEN
+    ALTER TABLE connections ADD COLUMN oauth_state TEXT;
+  END IF;
+END $$;
+EOF
+
+# 2. Open SQL Editor in browser
+open "https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new"
+
+# 3. Copy migration content
+cat scripts/migrations/08-add-oauth-columns.sql | pbcopy
+
+# 4. Paste in SQL Editor and click "Run"
+
+# 5. Verify column was added
+# Run in SQL Editor:
+# SELECT column_name FROM information_schema.columns 
+# WHERE table_name = 'connections';
+```
+
+
+---
+
+## Vercel CLI Usage
+
+### Installation
+```bash
+# Install globally via npm
+npm install -g vercel
+
+# Verify installation
+vercel --version
+```
+
+### Authentication
+```bash
+# Login to Vercel
+vercel login
+
+# Follow the email verification link sent to your email
+```
+
+### Project Setup
+```bash
+# Link current directory to Vercel project (run in project root)
+vercel link
+
+# Select your account and project:
+# ? Set up "~/stratifi"? [Y/n] Y
+# ? Which scope should contain your project? [Your Account]
+# ? Link to existing project? [Y/n] Y
+# ? What's the name of your existing project? stratifi
+```
+
+### Deployment
+
+#### Deploy to Preview
+```bash
+# Deploy to preview environment (generates unique URL)
+vercel
+
+# Deploy with specific name
+vercel --name stratifi-test
+
+# Deploy and get logs
+vercel --logs
+```
+
+#### Deploy to Production
+```bash
+# Deploy to production (stratifi.vercel.app)
+vercel --prod
+
+# Alias a preview deployment to production
+vercel alias <deployment-url> stratifi.vercel.app
+```
+
+#### Deploy Specific Branch
+```bash
+# Deploy current git branch
+vercel --prod --yes
+
+# Force deploy even if no changes detected
+vercel --prod --force
+```
+
+### Environment Variables
+
+#### List Environment Variables
+```bash
+# List all environment variables for production
+vercel env ls production
+
+# List for preview environment
+vercel env ls preview
+
+# List for development
+vercel env ls development
+```
+
+#### Add Environment Variables
+```bash
+# Add a new environment variable
+vercel env add VARIABLE_NAME
+
+# You'll be prompted to enter the value and select environments
+# Options: production, preview, development
+
+# Example workflow:
+vercel env add BUNQ_CLIENT_ID
+# ? What's the value of BUNQ_CLIENT_ID? your_client_id_here
+# ? Add BUNQ_CLIENT_ID to which Environments? Production, Preview
+
+# Add from file
+vercel env add NEXT_PUBLIC_SUPABASE_URL < value.txt
+```
+
+#### Remove Environment Variables
+```bash
+# Remove environment variable
+vercel env rm VARIABLE_NAME
+
+# Select which environment to remove from
+```
+
+#### Pull Environment Variables to Local
+```bash
+# Pull environment variables to .env.local
+vercel env pull .env.local
+
+# This downloads all development environment variables
+# Very useful for setting up local development
+```
+
+### View Deployments
+```bash
+# List recent deployments
+vercel ls
+
+# List deployments with more details
+vercel ls --debug
+
+# View specific deployment
+vercel inspect <deployment-url>
+```
+
+### Logs and Debugging
+```bash
+# View real-time logs for production
+vercel logs stratifi.vercel.app
+
+# Follow logs (like tail -f)
+vercel logs stratifi.vercel.app --follow
+
+# View logs for specific deployment
+vercel logs <deployment-url>
+
+# View logs since specific time
+vercel logs stratifi.vercel.app --since 1h
+vercel logs stratifi.vercel.app --since 2024-01-15
+```
+
+### Project Information
+```bash
+# View project details
+vercel project ls
+
+# View current project info
+vercel inspect
+
+# View domains
+vercel domains ls
+```
+
+### Useful Vercel Workflows
+
+#### Quick Production Deploy
+```bash
+# Full workflow: build, test, deploy
+npm run lint && npm run build && vercel --prod
+```
+
+#### Update Environment Variables
+```bash
+# Update production environment variable
+vercel env rm BUNQ_CLIENT_SECRET production
+vercel env add BUNQ_CLIENT_SECRET production
+
+# Then redeploy for changes to take effect
+vercel --prod
+```
+
+#### Rollback Deployment
+```bash
+# List recent deployments
+vercel ls
+
+# Promote a previous deployment to production
+vercel alias <previous-deployment-url> stratifi.vercel.app
+```
+
+#### Clone Environment from Production to Preview
+```bash
+# Pull production environment variables
+vercel env pull .env.production
+
+# Add them to preview
+cat .env.production | while IFS='=' read -r key value; do
+  echo "$value" | vercel env add "$key" preview
+done
+```
+
+### Troubleshooting with CLI
+
+#### Check Build Logs
+```bash
+# View build logs for failed deployment
+vercel logs <deployment-url> --until 30m
+
+# Debug mode for more verbose output
+vercel --debug
+```
+
+#### Test Production Build Locally
+```bash
+# Build production bundle
+npm run build
+
+# Test production build locally
+npm run start
+
+# If successful, deploy
+vercel --prod
+```
+
+#### Verify Environment Variables
+```bash
+# Check what environment variables are set
+vercel env ls production
+
+# Pull and inspect locally
+vercel env pull .env.verify
+cat .env.verify
+rm .env.verify
+```
+
+---
+
+## Combined Workflows (Supabase + Vercel)
+
+### Adding a New Database Feature
+```bash
+# 1. Create migration locally
+supabase migration new add-new-feature
+
+# 2. Edit the migration file in scripts/migrations/
+
+# 3. Test migration on remote database
+supabase db push
+
+# 4. Generate new TypeScript types
+supabase gen types typescript --project-id vnuithaqtpgbwmdvtxik > lib/database.types.ts
+
+# 5. Build and test locally
+npm run build
+
+# 6. Deploy to production
+vercel --prod
+```
+
+### Setting Up New Environment
+```bash
+# 1. Install CLI tools
+npm install -g vercel supabase
+
+# 2. Authenticate
+vercel login
+supabase login
+
+# 3. Link projects
+vercel link
+supabase link --project-ref vnuithaqtpgbwmdvtxik
+
+# 4. Pull environment variables
+vercel env pull .env.local
+
+# 5. Test local development
+npm run dev
+```
+
+### Debugging Production Issues
+```bash
+# 1. Check application logs
+vercel logs stratifi.vercel.app --follow
+
+# 2. Check database directly
+supabase db shell
+# Then run SQL queries to investigate
+
+# 3. Verify environment variables
+vercel env ls production
+
+# 4. Test with production data locally
+vercel env pull .env.local
+npm run dev
+```
+
+### Database Backup Before Major Changes
+```bash
+# 1. Export current schema
+supabase db pull
+
+# 2. Save schema to backup file
+supabase db dump --data-only > backup-$(date +%Y%m%d).sql
+
+# 3. Run your changes
+supabase db push
+
+# 4. If something goes wrong, restore from backup
+# supabase db execute --file backup-YYYYMMDD.sql
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**RLS Policy Errors:**
+- Check if RLS is enabled on table
+- Verify policy exists for operation (SELECT, INSERT, UPDATE, DELETE)
+- Ensure user has correct tenant relationship
+
+**Auth Errors:**
+- Verify Supabase environment variables
+- Check if session is valid
+- Ensure cookies are enabled
+
+**Build Errors:**
+- Run `npm run build` locally first
+- Fix TypeScript errors
+- Check for missing environment variables
+
+**Provider Integration Issues:**
+- Verify environment variables
+- Check OAuth redirect URI matches exactly
+- Test in sandbox/development environment
+- Review provider's API documentation
+
+---
+
+## Best Practices Summary
+
+### Code Quality
+- Write type-safe TypeScript
+- Use proper error handling
+- Show loading states
+- Validate user input
+- Write clear comments
+
+### Security
+- Use RLS for tenant isolation
+- Validate authentication
+- Check permissions
+- Never expose secrets
+- Sanitize input
+
+### Performance
+- Use server components when possible
+- Minimize client-side JavaScript
+- Optimize database queries
+- Cache where appropriate
+- Lazy load components
+
+### UX
+- Show loading indicators
+- Display helpful error messages
+- Provide clear navigation
+- Use consistent styling
+- Test on mobile devices
+
+---
+
+## Quick Reference
+
+### Get Current User
+```typescript
+const { user } = useAuth();
+```
+
+### Get Current Tenant
+```typescript
+const { currentTenant, userRole } = useTenant();
+```
+
+### Query with Tenant Filter
+```typescript
+const { data } = await supabase
+  .from('table')
+  .select('*')
+  .eq('tenant_id', currentTenant.id);
+```
+
+### Check Permissions
+```typescript
+const canEdit = ['owner', 'admin'].includes(userRole);
+```
+
+### API Route Pattern
+```typescript
+export async function GET(request: Request) {
+  try {
+    // Validate auth
+    // Process request
+    return NextResponse.json({ data: result });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Error message' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+---
+
+## Additional Resources
+
+- **Supabase Docs:** https://supabase.com/docs
+- **Next.js Docs:** https://nextjs.org/docs
+- **Tailwind CSS:** https://tailwindcss.com/docs
+- **TypeScript:** https://www.typescriptlang.org/docs
+- **Recharts:** https://recharts.org/
+
+---
+
+## Project Contacts
+
+- **Production App:** https://stratifi.vercel.app
+- **Supabase Dashboard:** https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik
+- **GitHub:** https://github.com/scottystephens/stratifi
+
+---
+
+**Remember:** This is a production SaaS platform. Write code that is secure, maintainable, and scalable. Always consider multi-tenancy, security, and user experience in your implementations.
+
