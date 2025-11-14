@@ -30,8 +30,25 @@ export async function POST(req: NextRequest) {
       userId, // We'll pass this from the client
     } = body;
 
+    console.log('📥 Import request received:', {
+      hasContent: !!content,
+      hasColumnMapping: !!columnMapping,
+      connectionName,
+      accountId,
+      tenantId,
+      userId,
+    });
+
     // Validate required fields
     if (!content || !columnMapping || !connectionName || !accountId || !tenantId || !userId) {
+      console.error('Missing required fields:', {
+        content: !!content,
+        columnMapping: !!columnMapping,
+        connectionName: !!connectionName,
+        accountId: !!accountId,
+        tenantId: !!tenantId,
+        userId: !!userId,
+      });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -40,6 +57,17 @@ export async function POST(req: NextRequest) {
 
     // Verify user has access to this tenant by checking user_tenants table
     const supabase = await createClient();
+    
+    console.log('🔍 Checking user_tenants for:', { userId, tenantId });
+    
+    // First, let's see all user_tenants for this user
+    const { data: allUserTenants, error: allTenantsError } = await supabase
+      .from('user_tenants')
+      .select('*')
+      .eq('user_id', userId);
+    
+    console.log('📊 All tenants for user:', allUserTenants);
+    
     const { data: userTenant, error: tenantCheckError } = await supabase
       .from('user_tenants')
       .select('role')
@@ -48,14 +76,29 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (tenantCheckError || !userTenant) {
-      console.error('User not authorized for tenant:', { userId, tenantId, error: tenantCheckError });
+      console.error('❌ User not authorized for tenant:', { 
+        userId, 
+        tenantId, 
+        error: tenantCheckError,
+        errorCode: tenantCheckError?.code,
+        errorMessage: tenantCheckError?.message,
+        allUserTenants: allUserTenants?.length || 0
+      });
       return NextResponse.json(
-        { error: 'Unauthorized - User does not have access to this organization' },
+        { 
+          error: 'Unauthorized - User does not have access to this organization',
+          debug: {
+            userId,
+            tenantId,
+            errorCode: tenantCheckError?.code,
+            userTenantsCount: allUserTenants?.length || 0
+          }
+        },
         { status: 403 }
       );
     }
 
-    console.log('User authorized:', { userId, tenantId, role: userTenant.role });
+    console.log('✅ User authorized:', { userId, tenantId, role: userTenant.role });
 
     // Step 1: Create connection record
     let connection;

@@ -118,6 +118,16 @@ export default function NewConnectionPage() {
       return;
     }
 
+    console.log('🚀 Starting import with:', {
+      userId: user.id,
+      userEmail: user.email,
+      tenantId: currentTenant.id,
+      tenantName: currentTenant.name,
+      accountId: selectedAccountId,
+      connectionName,
+      importMode,
+    });
+
     try {
       setImporting(true);
       const response = await fetch('/api/ingestion/csv/import', {
@@ -143,7 +153,8 @@ export default function NewConnectionPage() {
         setImportResult(data);
         setStep('results');
       } else {
-        alert(`Import failed: ${data.error}`);
+        console.error('❌ Import failed:', data);
+        alert(`Import failed: ${data.error}\n\nDebug Info:\n${JSON.stringify(data.debug, null, 2)}`);
       }
     } catch (error) {
       console.error('Import error:', error);
