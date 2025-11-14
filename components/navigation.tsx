@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useTenant } from '@/lib/tenant-context'
 import { useAuth } from '@/lib/auth-context'
+import { StratifiLogo } from './stratifi-logo'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -57,25 +58,35 @@ export function Navigation() {
       isCollapsed ? "w-16" : "w-64"
     )}>
       {/* Logo & Collapse Button */}
-      <div className="flex h-16 items-center justify-between border-b px-3">
+      <div className="flex h-16 items-center justify-between border-b px-4">
         {!isCollapsed && (
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="text-lg font-bold text-primary-foreground">T</span>
-            </div>
-            <span className="text-xl font-bold">TreasuryX</span>
+          <Link href="/dashboard" className="flex items-center">
+            <StratifiLogo variant="full" size="sm" className="text-primary" />
           </Link>
         )}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className={cn(
-            "p-2 rounded-lg hover:bg-accent transition-colors",
-            isCollapsed && "mx-auto"
-          )}
-          title={isCollapsed ? "Expand menu" : "Collapse menu"}
-        >
-          {isCollapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}
-        </button>
+        {isCollapsed && (
+          <Link href="/dashboard" className="mx-auto">
+            <StratifiLogo variant="icon" size="sm" className="text-primary" />
+          </Link>
+        )}
+        {!isCollapsed && (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-2 rounded-lg hover:bg-accent transition-colors"
+            title="Collapse menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
+        {isCollapsed && (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="absolute top-4 right-2 p-2 rounded-lg hover:bg-accent transition-colors"
+            title="Expand menu"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Tenant Switcher */}

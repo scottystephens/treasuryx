@@ -1,6 +1,6 @@
-# TreasuryX Documentation
+# Stratifi Documentation
 
-Comprehensive documentation for the TreasuryX treasury management platform.
+Comprehensive documentation for the Stratifi treasury management platform.
 
 ## Directory Structure
 
@@ -66,8 +66,8 @@ Historical documentation (for reference):
 
 ### External Resources
 - [Supabase Dashboard](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik)
-- [Production App](https://treasuryx-pi.vercel.app)
-- [GitHub Repository](https://github.com/scottystephens/treasuryx)
+- [Production App](https://stratifi-pi.vercel.app)
+- [GitHub Repository](https://github.com/scottystephens/stratifi)
 
 ---
 

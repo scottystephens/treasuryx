@@ -1,8 +1,8 @@
-# TreasuryX - Project Overview
+# Stratifi - Project Overview
 
 ## 🎯 What Was Built
 
-TreasuryX is a fully functional treasury management system prototype modeled after Treasury4. It's production-ready in architecture and can be easily scaled with real databases and external integrations.
+Stratifi is a fully functional treasury management system prototype modeled after Treasury4. It's production-ready in architecture and can be easily scaled with real databases and external integrations.
 
 ## 📊 Core Modules
 
@@ -111,7 +111,7 @@ TreasuryX is a fully functional treasury management system prototype modeled aft
 ## 📁 Project Structure
 
 ```
-treasuryx/
+stratifi/
 ├── app/
 │   ├── api/              # API routes
 │   │   ├── accounts/

@@ -1,7 +1,9 @@
 {
-  "name": "treasuryx",
-  "version": "0.1.0",
+  "name": "stratifi",
+  "version": "1.0.0",
   "private": true,
+  "description": "Strategic Financial Intelligence Platform - Multi-tenant treasury management and data ingestion",
+  "author": "Scott Stephens",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -17,6 +19,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "dotenv": "^17.2.3",
+    "framer-motion": "^11.0.0",
     "lucide-react": "^0.436.0",
     "next": "14.2.5",
     "papaparse": "^5.5.3",

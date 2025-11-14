@@ -8,7 +8,7 @@
 ## 📁 New Structure
 
 ```
-treasuryx/
+stratifi/
 ├── app/                              # Next.js application
 │   ├── accounts/                     # Account management
 │   ├── connections/                  # Data connections

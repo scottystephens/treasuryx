@@ -6,7 +6,7 @@ The `/rates` page is stuck in a loading state because the client-side fetch is n
 
 ### Diagnosis
 
-- ✅ API endpoint works: `curl https://treasuryx-pi.vercel.app/api/exchange-rates` returns data
+- ✅ API endpoint works: `curl https://stratifi-pi.vercel.app/api/exchange-rates` returns data
 - ✅ Page compiles without errors
 - ✅ Navigation renders correctly
 - ❌ Client component's useEffect fetch never completes
@@ -57,7 +57,7 @@ const CURRENCIES: Currency[] = [
 async function getRates(): Promise<{ rates: ExchangeRate[], usingFallback: boolean, message?: string }> {
   try {
     // In Server Component, use full URL
-    const res = await fetch('https://treasuryx-pi.vercel.app/api/exchange-rates', {
+    const res = await fetch('https://stratifi-pi.vercel.app/api/exchange-rates', {
       cache: 'no-store', // Always get fresh data
     })
     
@@ -158,7 +158,7 @@ export default async function ExchangeRatesPage() {
 
 If you need client interactivity, debug the Client Component:
 
-1. **Check browser console** - Open https://treasuryx-pi.vercel.app/rates in browser DevTools
+1. **Check browser console** - Open https://stratifi-pi.vercel.app/rates in browser DevTools
 2. **Look for errors** - Check Network tab and Console
 3. **Test fetch directly** - In browser console: `fetch('/api/exchange-rates').then(r => r.json()).then(console.log)`
 
@@ -181,9 +181,9 @@ npx ts-node scripts/backfill-exchange-rates.ts 2025-01-01
 
 ## Testing
 
-1. **Test API**: `curl https://treasuryx-pi.vercel.app/api/exchange-rates`
-2. **Test page**: Visit https://treasuryx-pi.vercel.app/rates
-3. **Test manual update**: `curl -X POST https://treasuryx-pi.vercel.app/api/exchange-rates/update`
+1. **Test API**: `curl https://stratifi-pi.vercel.app/api/exchange-rates`
+2. **Test page**: Visit https://stratifi-pi.vercel.app/rates
+3. **Test manual update**: `curl -X POST https://stratifi-pi.vercel.app/api/exchange-rates/update`
 
 ## Production Checklist
 

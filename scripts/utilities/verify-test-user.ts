@@ -22,7 +22,7 @@ async function verifyTestUser() {
     });
     
     const usersData = await usersResponse.json();
-    const testUser = usersData.users?.find((u: any) => u.email === 'test@treasuryx.com');
+    const testUser = usersData.users?.find((u: any) => u.email === 'test@stratifi.com');
     
     if (!testUser) {
       console.error('❌ Test user not found!');

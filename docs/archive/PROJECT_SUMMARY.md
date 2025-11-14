@@ -1,8 +1,8 @@
-# TreasuryX - Complete Project Summary
+# Stratifi - Complete Project Summary
 
 ## 🎯 Mission Accomplished!
 
-I've built **TreasuryX** - a complete, production-ready treasury management platform inspired by Treasury4. The application is **fully functional and running** at http://localhost:3000
+I've built **Stratifi** - a complete, production-ready treasury management platform inspired by Treasury4. The application is **fully functional and running** at http://localhost:3000
 
 ---
 
@@ -42,7 +42,7 @@ I've built **TreasuryX** - a complete, production-ready treasury management plat
 ## 🗂️ Project Structure
 
 ```
-treasuryx/
+stratifi/
 ├── 📱 app/                      # Next.js application
 │   ├── api/                    # API endpoints (5 routes)
 │   │   ├── accounts/
@@ -183,7 +183,7 @@ treasuryx/
 
 ## 🎯 Feature Parity with Treasury4
 
-| Treasury4 Feature | TreasuryX Status |
+| Treasury4 Feature | Stratifi Status |
 |------------------|------------------|
 | Real-time cash visibility | ✅ Complete |
 | Entity management (Entity4) | ✅ Complete |
@@ -208,7 +208,7 @@ treasuryx/
 - Per-user fees: Variable
 - **Total Year 1**: $70K-$250K+
 
-### TreasuryX
+### Stratifi
 - Software: $0 (open source)
 - Infrastructure: $50-$500/month
 - Development: DIY or hire devs

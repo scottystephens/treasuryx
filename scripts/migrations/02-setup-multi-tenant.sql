@@ -1,5 +1,5 @@
 -- =====================================================
--- TreasuryX Multi-Tenant Database Setup
+-- Stratifi Multi-Tenant Database Setup
 -- Production-Quality Multi-Tenancy with RLS
 -- =====================================================
 

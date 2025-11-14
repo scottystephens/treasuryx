@@ -7,8 +7,9 @@ import { TenantProvider } from "@/lib/tenant-context"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "TreasuryX - Modern Treasury Management",
-  description: "AI-powered treasury management platform for enterprise cash visibility, entity management, and payment operations",
+  title: "Stratifi - Strategic Financial Intelligence",
+  description: "Multi-tenant treasury management platform with intelligent data ingestion, account management, and real-time financial insights",
+  keywords: ["treasury management", "financial intelligence", "cash management", "multi-tenant", "data ingestion", "bank reconciliation"],
 }
 
 export default function RootLayout({

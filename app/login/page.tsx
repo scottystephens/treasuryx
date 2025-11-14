@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { StratifiLogoColored } from '@/components/stratifi-logo'
 import Link from 'next/link'
 import { AlertCircle, Loader2 } from 'lucide-react'
 
@@ -30,19 +31,17 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8">
-        <div className="mb-8 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-              <span className="text-2xl font-bold text-primary-foreground">T</span>
-            </div>
+      <Card className="w-full max-w-md p-10 shadow-lg">
+        <div className="mb-10 text-center">
+          <div className="flex justify-center mb-6">
+            <StratifiLogoColored size="lg" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
-          <p className="text-gray-600 mt-2">Sign in to your TreasuryX account</p>
+          <p className="text-gray-600 mt-2">Sign in to your Stratifi account</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="font-semibold text-red-900">Sign in failed</h3>
@@ -51,7 +50,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
               Email address
@@ -62,7 +61,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
               placeholder="you@company.com"
               disabled={loading}
             />
@@ -78,17 +77,16 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
               placeholder="••••••••"
               disabled={loading}
-              minLength={6}
             />
           </div>
 
           <Button
             type="submit"
             disabled={loading}
-            className="w-full"
+            className="w-full py-3 text-base font-semibold"
           >
             {loading ? (
               <>
@@ -104,19 +102,12 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-primary font-semibold hover:underline">
+            <Link href="/signup" className="font-semibold text-primary hover:underline">
               Sign up
             </Link>
-          </p>
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
-            By signing in, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>
       </Card>
     </div>
   )
 }
-

@@ -1,4 +1,4 @@
-# Data Ingestion Architecture - TreasuryX
+# Data Ingestion Architecture - Stratifi
 
 ## Overview
 Multi-source data ingestion system for bank statements, transactions, and balance data from BAI2 files, APIs (Plaid, Stripe, bank APIs), and SFTP servers.

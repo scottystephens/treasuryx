@@ -4,26 +4,34 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Stratifi Brand Colors */
+    --background: 220 20% 98%;  /* Light gray background #F8FAFC */
+    --foreground: 217 33% 17%;  /* Slate gray text #1E293B */
+    --card: 0 0% 100%;          /* White cards */
+    --card-foreground: 217 33% 17%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --popover-foreground: 217 33% 17%;
+    
+    /* Stratifi Blue #0066FF */
+    --primary: 217 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Stratifi Deep Blue #003D99 */
+    --secondary: 217 100% 30%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 217 32% 96%;        /* Light slate */
+    --muted-foreground: 215 16% 47%;  /* Medium slate */
+    --accent: 217 32% 96%;
+    --accent-foreground: 217 33% 17%;
+    
+    --destructive: 0 84% 60%;    /* Red #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 217 20% 92%;       /* Light border */
+    --input: 217 20% 92%;
+    --ring: 217 100% 50%;        /* Stratifi Blue ring */
+    --radius: 0.75rem;           /* Increased border radius for modern look */
   }
 
   .dark {
@@ -54,7 +62,47 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* Stratifi Professional Spacing & Design */
+@layer components {
+  /* Page containers with optimal spacing */
+  .stratifi-page-container {
+    @apply max-w-7xl mx-auto px-6 py-8;
+  }
+  
+  .stratifi-page-header {
+    @apply mb-8;
+  }
+  
+  /* Card enhancements */
+  .stratifi-card {
+    @apply bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  
+  /* Professional shadows */
+  .stratifi-shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+  
+  .stratifi-shadow {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  }
+  
+  .stratifi-shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Grid layouts */
+  .stratifi-grid {
+    @apply grid gap-6 md:grid-cols-2 lg:grid-cols-3;
+  }
+  
+  /* Professional animations */
+  .stratifi-transition {
+    @apply transition-all duration-200 ease-in-out;
   }
 }
 

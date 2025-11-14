@@ -1,9 +1,13 @@
-# TreasuryX
+# Stratifi
 
-A modern, production-ready **multi-tenant SaaS treasury management platform** for enterprise cash visibility, bank account management, and data ingestion.
+## Strategic Financial Intelligence Platform
 
-[![Production](https://img.shields.io/badge/production-live-green)](https://treasuryx-pi.vercel.app)
+A modern, production-ready **multi-tenant SaaS platform** for intelligent treasury management, bank account operations, and automated data ingestion.
+
+[![Production](https://img.shields.io/badge/production-live-blue)](https://treasuryx-pi.vercel.app)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
 
 ---
 

@@ -1,4 +1,4 @@
-# TreasuryX - Quick Start Guide
+# Stratifi - Quick Start Guide
 
 ## 🎉 Your Treasury Management Platform is Ready!
 
@@ -97,7 +97,7 @@ The app comes with realistic mock data:
 
 ```bash
 # If server stops, restart with:
-cd /Users/scottstephens/treasuryx
+cd /Users/scottstephens/stratifi
 npm run dev
 
 # Open in different port:
@@ -113,7 +113,7 @@ npm start
 ### 1. Add Your Company Branding
 Edit `components/navigation.tsx`:
 ```typescript
-// Change "TreasuryX" to your company name
+// Change "Stratifi" to your company name
 <span className="text-xl font-bold">Your Company</span>
 ```
 
@@ -194,7 +194,7 @@ Read these for more details:
 lsof -ti:3000 | xargs kill -9
 
 # Restart
-cd /Users/scottstephens/treasuryx
+cd /Users/scottstephens/stratifi
 npm run dev
 ```
 

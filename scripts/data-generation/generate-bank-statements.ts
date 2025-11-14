@@ -304,7 +304,7 @@ All CSV files follow this format:
 
 ## Usage
 
-### Import to TreasuryX
+### Import to Stratifi
 
 1. Go to \`/connections/new\`
 2. Upload CSV file

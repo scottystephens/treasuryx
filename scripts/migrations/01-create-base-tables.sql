@@ -1,5 +1,5 @@
 -- =====================================================
--- TreasuryX Base Tables
+-- Stratifi Base Tables
 -- Core financial data tables (before multi-tenancy)
 -- =====================================================
 

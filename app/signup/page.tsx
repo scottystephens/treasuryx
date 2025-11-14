@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { StratifiLogoColored } from '@/components/stratifi-logo'
 import Link from 'next/link'
-import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -19,13 +20,11 @@ export default function SignupPage() {
     e.preventDefault()
     setError(null)
 
-    // Validate passwords match
     if (password !== confirmPassword) {
       setError('Passwords do not match')
       return
     }
 
-    // Validate password strength
     if (password.length < 6) {
       setError('Password must be at least 6 characters')
       return
@@ -36,38 +35,25 @@ export default function SignupPage() {
     try {
       await signUp(email, password)
     } catch (err: any) {
-      setError(err.message || 'Failed to sign up')
+      setError(err.message || 'Failed to create account')
     } finally {
       setLoading(false)
     }
   }
 
-  // Password strength indicator
-  const getPasswordStrength = () => {
-    if (password.length === 0) return null
-    if (password.length < 6) return { label: 'Too short', color: 'bg-red-500' }
-    if (password.length < 8) return { label: 'Weak', color: 'bg-yellow-500' }
-    if (password.length < 12) return { label: 'Good', color: 'bg-blue-500' }
-    return { label: 'Strong', color: 'bg-green-500' }
-  }
-
-  const passwordStrength = getPasswordStrength()
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8">
-        <div className="mb-8 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-              <span className="text-2xl font-bold text-primary-foreground">T</span>
-            </div>
+      <Card className="w-full max-w-md p-10 shadow-lg">
+        <div className="mb-10 text-center">
+          <div className="flex justify-center mb-6">
+            <StratifiLogoColored size="lg" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Get Started</h1>
-          <p className="text-gray-600 mt-2">Create your TreasuryX account</p>
+          <p className="text-gray-600 mt-2">Create your Stratifi account</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="font-semibold text-red-900">Sign up failed</h3>
@@ -76,10 +62,10 @@ export default function SignupPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Work email
+              Email address
             </label>
             <input
               id="email"
@@ -87,7 +73,7 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
               placeholder="you@company.com"
               disabled={loading}
             />
@@ -103,27 +89,15 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
               placeholder="••••••••"
               disabled={loading}
-              minLength={6}
             />
-            {passwordStrength && (
-              <div className="mt-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div className={`h-full ${passwordStrength.color} transition-all`} 
-                         style={{ width: `${(password.length / 12) * 100}%` }} />
-                  </div>
-                  <span className="text-xs text-gray-600">{passwordStrength.label}</span>
-                </div>
-              </div>
-            )}
           </div>
 
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-              Confirm password
+              Confirm Password
             </label>
             <input
               id="confirmPassword"
@@ -131,23 +105,16 @@ export default function SignupPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
               placeholder="••••••••"
               disabled={loading}
-              minLength={6}
             />
-            {confirmPassword && confirmPassword === password && (
-              <div className="mt-2 flex items-center gap-1 text-green-600">
-                <CheckCircle2 className="w-4 h-4" />
-                <span className="text-xs">Passwords match</span>
-              </div>
-            )}
           </div>
 
           <Button
             type="submit"
             disabled={loading}
-            className="w-full"
+            className="w-full py-3 text-base font-semibold"
           >
             {loading ? (
               <>
@@ -163,19 +130,12 @@ export default function SignupPage() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             Already have an account?{' '}
-            <Link href="/login" className="text-primary font-semibold hover:underline">
+            <Link href="/login" className="font-semibold text-primary hover:underline">
               Sign in
             </Link>
-          </p>
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
-            By creating an account, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>
       </Card>
     </div>
   )
 }
-

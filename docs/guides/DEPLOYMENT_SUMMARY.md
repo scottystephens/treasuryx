@@ -169,10 +169,10 @@ The generated data includes realistic banking patterns:
 - **Status**: Live and ready for testing
 
 ### Production URLs:
-- **App**: https://treasuryx-pi.vercel.app
-- **Connections**: https://treasuryx-pi.vercel.app/connections
-- **New Import**: https://treasuryx-pi.vercel.app/connections/new
-- **Login**: https://treasuryx-pi.vercel.app/login
+- **App**: https://stratifi-pi.vercel.app
+- **Connections**: https://stratifi-pi.vercel.app/connections
+- **New Import**: https://stratifi-pi.vercel.app/connections/new
+- **Login**: https://stratifi-pi.vercel.app/login
 
 ---
 
@@ -194,7 +194,7 @@ This creates all necessary tables, policies, and indexes.
 
 ### Local Testing
 1. `npm run dev`
-2. Login: `test@treasuryx.com` / `test123456`
+2. Login: `test@stratifi.com` / `test123456`
 3. Go to: http://localhost:3000/connections
 4. Click "New Connection"
 5. Upload CSV from `data/backups/bank-statements/`
@@ -205,9 +205,9 @@ This creates all necessary tables, policies, and indexes.
    - **Step 4**: Import & view results
 
 ### Production Testing
-1. Go to: https://treasuryx-pi.vercel.app/login
+1. Go to: https://stratifi-pi.vercel.app/login
 2. Login with your credentials
-3. Navigate to: https://treasuryx-pi.vercel.app/connections
+3. Navigate to: https://stratifi-pi.vercel.app/connections
 4. Upload one of the generated CSV files
 5. Test both import modes:
    - **Append**: Add new transactions

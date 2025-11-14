@@ -40,7 +40,7 @@ SQL files to set up and enhance database tables. **Run in order:**
 Scripts to create test data for development.
 
 ### User & Organization Setup
-- **create-test-user.ts** - Create test user (test@treasuryx.com)
+- **create-test-user.ts** - Create test user (test@stratifi.com)
 - **setup-test-user-org.ts** - Create organization for test user
 - **create-test-accounts-v2.ts** - Create 4 test bank accounts
 

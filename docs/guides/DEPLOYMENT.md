@@ -1,4 +1,4 @@
-# TreasuryX Deployment Guide
+# Stratifi Deployment Guide
 
 ## 🚀 Quick Start (Local Development)
 
@@ -8,7 +8,7 @@ The application is already running! Open your browser to:
 
 If it's not running, start it with:
 ```bash
-cd /Users/scottstephens/treasuryx
+cd /Users/scottstephens/stratifi
 npm run dev
 ```
 
@@ -50,19 +50,19 @@ Vercel is the creators of Next.js and offers the best Next.js hosting experience
 npm install -g vercel
 
 # Deploy (from project directory)
-cd /Users/scottstephens/treasuryx
+cd /Users/scottstephens/stratifi
 vercel
 
 # Follow the prompts:
 # - Set up and deploy? Yes
 # - Which scope? Your account
 # - Link to existing project? No
-# - What's your project's name? treasuryx
+# - What's your project's name? stratifi
 # - In which directory is your code located? ./
 # - Override settings? No
 ```
 
-Your app will be live at: `https://treasuryx.vercel.app` (or similar)
+Your app will be live at: `https://stratifi.vercel.app` (or similar)
 
 **Vercel Benefits:**
 - ✅ Zero configuration
@@ -103,10 +103,10 @@ sudo apt install nodejs npm nginx
 
 # Clone/upload your code
 cd /home/ubuntu
-# ... upload treasuryx folder ...
+# ... upload stratifi folder ...
 
 # Install dependencies
-cd treasuryx
+cd stratifi
 npm install
 
 # Build
@@ -114,12 +114,12 @@ npm run build
 
 # Run with PM2 (process manager)
 npm install -g pm2
-pm2 start npm --name "treasuryx" -- start
+pm2 start npm --name "stratifi" -- start
 pm2 save
 pm2 startup
 
 # Configure Nginx as reverse proxy
-sudo nano /etc/nginx/sites-available/treasuryx
+sudo nano /etc/nginx/sites-available/stratifi
 ```
 
 Nginx config:
@@ -160,10 +160,10 @@ CMD ["npm", "start"]
 EOF
 
 # Build image
-docker build -t treasuryx .
+docker build -t stratifi .
 
 # Run container
-docker run -p 3000:3000 treasuryx
+docker run -p 3000:3000 stratifi
 ```
 
 Deploy to any cloud:
@@ -196,7 +196,7 @@ Create `.env.local` for local development or add to your hosting platform:
 
 ```bash
 # Database (when you migrate from CSV)
-DATABASE_URL="postgresql://user:password@host:5432/treasuryx"
+DATABASE_URL="postgresql://user:password@host:5432/stratifi"
 
 # Authentication (NextAuth.js)
 NEXTAUTH_URL="https://your-domain.com"
@@ -271,7 +271,7 @@ sudo systemctl start postgresql
 ### 2. Create Database
 
 ```sql
-CREATE DATABASE treasuryx;
+CREATE DATABASE stratifi;
 
 CREATE TABLE entities (
     entity_id VARCHAR(20) PRIMARY KEY,
@@ -341,13 +341,13 @@ CREATE TABLE forecasts (
 
 ```bash
 # Using psql
-psql -U postgres -d treasuryx
+psql -U postgres -d stratifi
 
-\copy entities FROM '/Users/scottstephens/treasuryx/data/entities.csv' CSV HEADER
-\copy accounts FROM '/Users/scottstephens/treasuryx/data/accounts.csv' CSV HEADER
-\copy transactions FROM '/Users/scottstephens/treasuryx/data/transactions.csv' CSV HEADER
-\copy payments FROM '/Users/scottstephens/treasuryx/data/payments.csv' CSV HEADER
-\copy forecasts FROM '/Users/scottstephens/treasuryx/data/forecast.csv' CSV HEADER
+\copy entities FROM '/Users/scottstephens/stratifi/data/entities.csv' CSV HEADER
+\copy accounts FROM '/Users/scottstephens/stratifi/data/accounts.csv' CSV HEADER
+\copy transactions FROM '/Users/scottstephens/stratifi/data/transactions.csv' CSV HEADER
+\copy payments FROM '/Users/scottstephens/stratifi/data/payments.csv' CSV HEADER
+\copy forecasts FROM '/Users/scottstephens/stratifi/data/forecast.csv' CSV HEADER
 ```
 
 ### 4. Update Code to Use Database
