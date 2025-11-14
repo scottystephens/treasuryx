@@ -200,24 +200,24 @@ export async function exchangeCodeForToken(
     client_secret: BUNQ_CONFIG.clientSecret,
   });
   
-  // Bunq seems to want parameters as query string, not body
-  const tokenUrl = `${BUNQ_CONFIG.tokenUrl}?${params.toString()}`;
-  
   console.log('🔄 Exchanging code for token...');
-  console.log('Token URL (with params):', tokenUrl);
+  console.log('Token URL:', BUNQ_CONFIG.tokenUrl);
   console.log('Redirect URI:', BUNQ_CONFIG.redirectUri);
   console.log('Client ID:', BUNQ_CONFIG.clientId?.substring(0, 20) + '...');
+  console.log('Code:', code?.substring(0, 20) + '...');
   
   try {
-    const response = await fetch(tokenUrl, {
+    // Standard OAuth2: POST with form-encoded body
+    const response = await fetch(BUNQ_CONFIG.tokenUrl, {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Cache-Control': 'no-cache',
       },
+      body: params.toString(),
     });
     
     console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -231,12 +231,12 @@ export async function exchangeCodeForToken(
       }
       
       throw new Error(
-        `Bunq token exchange failed: ${error.error_description || response.statusText}`
+        `Bunq token exchange failed: ${error.error_description || error.error || response.statusText}`
       );
     }
     
     const data: BunqOAuthTokenResponse = await response.json();
-    console.log('✅ Token exchange successful');
+    console.log('✅ Token exchange successful!');
     return data;
   } catch (error) {
     console.error('❌ Error exchanging Bunq authorization code:', error);
