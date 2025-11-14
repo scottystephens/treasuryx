@@ -627,3 +627,152 @@ export async function createAuditLog(log: {
     // Don't throw - audit logging should not break the main flow
   }
 }
+
+// =====================================================
+// Accounts Management Functions
+// =====================================================
+
+export interface Account {
+  id?: string
+  tenant_id: string
+  account_name: string
+  account_number?: string
+  account_type: string
+  account_status?: string
+  bank_name?: string
+  bank_identifier?: string
+  branch_name?: string
+  branch_code?: string
+  currency?: string
+  opening_date?: string
+  closing_date?: string
+  interest_rate?: number
+  current_balance?: number
+  available_balance?: number
+  ledger_balance?: number
+  overdraft_limit?: number
+  credit_limit?: number
+  minimum_balance?: number
+  business_unit?: string
+  cost_center?: string
+  gl_account_code?: string
+  purpose?: string
+  account_manager?: string
+  authorized_signers?: string[]
+  external_account_id?: string
+  plaid_account_id?: string
+  sync_enabled?: boolean
+  last_synced_at?: string
+  custom_fields?: Record<string, any>
+  notes?: string
+  tags?: string[]
+  created_at?: string
+  updated_at?: string
+  created_by?: string
+}
+
+export async function getAccountsByTenant(tenantId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('account_name')
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching accounts:', error)
+    throw error
+  }
+}
+
+export async function getAccountById(tenantId: string, accountId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('id', accountId)
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error fetching account:', error)
+    throw error
+  }
+}
+
+export async function createAccount(account: Account) {
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert(account)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error creating account:', error)
+    throw error
+  }
+}
+
+export async function updateAccount(
+  tenantId: string,
+  accountId: string,
+  updates: Partial<Account>
+) {
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .update(updates)
+      .eq('tenant_id', tenantId)
+      .eq('id', accountId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error updating account:', error)
+    throw error
+  }
+}
+
+export async function deleteAccount(tenantId: string, accountId: string) {
+  try {
+    const { error } = await supabase
+      .from('accounts')
+      .delete()
+      .eq('tenant_id', tenantId)
+      .eq('id', accountId)
+
+    if (error) throw error
+  } catch (error) {
+    console.error('Error deleting account:', error)
+    throw error
+  }
+}
+
+// Get accounts summary with transaction counts and balances
+export async function getAccountsSummary(tenantId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select(`
+        *,
+        transactions:transactions(count)
+      `)
+      .eq('tenant_id', tenantId)
+      .order('account_name')
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('Error fetching accounts summary:', error)
+    throw error
+  }
+}

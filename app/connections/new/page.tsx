@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
 import { useAuth } from '@/lib/auth-context';
@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import type { Account } from '@/lib/supabase';
 
 // Step 1: File Upload
 // Step 2: Column Mapping
@@ -51,6 +52,33 @@ export default function NewConnectionPage() {
   const [importMode, setImportMode] = useState<'append' | 'override'>('append');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  // Load accounts when currentTenant changes
+  useEffect(() => {
+    if (currentTenant) {
+      loadAccounts();
+    }
+  }, [currentTenant]);
+
+  async function loadAccounts() {
+    if (!currentTenant) return;
+
+    try {
+      setLoadingAccounts(true);
+      const response = await fetch(`/api/accounts?tenantId=${currentTenant.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setAccounts(data.accounts);
+      }
+    } catch (error) {
+      console.error('Error loading accounts:', error);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  }
 
   // Step 1: Handle file upload
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -408,15 +436,29 @@ export default function NewConnectionPage() {
                     value={selectedAccountId}
                     onChange={(e) => setSelectedAccountId(e.target.value)}
                     className="w-full border rounded px-3 py-2"
+                    disabled={loadingAccounts}
                   >
                     <option value="">-- None (Import without account link) --</option>
-                    {/* TODO: Load accounts from API */}
-                    <option value="dummy-account-1">Main Operating Account</option>
-                    <option value="dummy-account-2">Savings Account</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.account_name} ({account.currency || 'USD'})
+                        {account.account_number && ` - ••••${account.account_number.slice(-4)}`}
+                      </option>
+                    ))}
                   </select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    You can link transactions to an account later
-                  </p>
+                  {accounts.length === 0 && !loadingAccounts && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      No accounts found.{' '}
+                      <a href="/accounts/new" className="underline">
+                        Create an account first
+                      </a>
+                    </p>
+                  )}
+                  {accounts.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Link transactions to an existing account or import without linking
+                    </p>
+                  )}
                 </div>
 
                 <div>

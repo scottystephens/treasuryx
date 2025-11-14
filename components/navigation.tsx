@@ -26,7 +26,8 @@ import { useAuth } from '@/lib/auth-context'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Cash Management', href: '/cash', icon: Wallet },
+  { name: 'Accounts', href: '/accounts', icon: Wallet },
+  { name: 'Cash Management', href: '/cash', icon: TrendingUp },
   { name: 'Entities', href: '/entities', icon: Building2 },
   { name: 'Payments', href: '/payments', icon: Send },
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
