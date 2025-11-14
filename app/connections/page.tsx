@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
+import { Navigation } from '@/components/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -131,7 +132,7 @@ export default function ConnectionsPage() {
 
   return (
     <div className="flex h-screen">
-      {/* Navigation would go here - reuse your existing nav component */}
+      <Navigation />
       
       <main className="flex-1 overflow-y-auto bg-background p-8">
         <div className="max-w-6xl mx-auto">

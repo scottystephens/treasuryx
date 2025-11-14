@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
 import { useAuth } from '@/lib/auth-context';
+import { Navigation } from '@/components/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -154,14 +155,23 @@ export default function NewConnectionPage() {
 
   if (!currentTenant) {
     return (
-      <div className="p-8">
-        <p>Please select an organization</p>
+      <div className="flex h-screen">
+        <Navigation />
+        <main className="flex-1 overflow-y-auto bg-background p-8">
+          <Card className="p-12 text-center max-w-2xl mx-auto mt-8">
+            <h2 className="text-2xl font-semibold mb-4">No Organization Selected</h2>
+            <p className="text-muted-foreground mb-6">
+              Please select an organization from the sidebar to import data.
+            </p>
+          </Card>
+        </main>
       </div>
     );
   }
 
   return (
     <div className="flex h-screen">
+      <Navigation />
       <main className="flex-1 overflow-y-auto bg-background p-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
