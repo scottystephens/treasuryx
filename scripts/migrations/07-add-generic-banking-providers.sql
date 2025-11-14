@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS provider_accounts (
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   connection_id UUID NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL REFERENCES banking_providers(id) ON DELETE CASCADE,
-  account_id UUID REFERENCES accounts(id) ON DELETE SET NULL, -- Link to Stratifi account
+  account_id TEXT REFERENCES accounts(account_id) ON DELETE SET NULL, -- Link to Stratifi account
   
   -- Provider account data
   external_account_id TEXT NOT NULL, -- Account ID in provider's system
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS provider_transactions (
   connection_id UUID NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
   provider_id TEXT NOT NULL REFERENCES banking_providers(id) ON DELETE CASCADE,
   provider_account_id UUID REFERENCES provider_accounts(id) ON DELETE CASCADE,
-  transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL, -- Link to imported transaction
+  transaction_id TEXT REFERENCES transactions(transaction_id) ON DELETE SET NULL, -- Link to imported transaction
   
   -- Provider transaction data
   external_transaction_id TEXT NOT NULL,
