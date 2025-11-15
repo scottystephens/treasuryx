@@ -143,17 +143,55 @@ export async function POST(req: NextRequest) {
               .from('accounts')
               .update({
                 current_balance: formatBunqAmount(bunqAccount.balance),
-                account_status: bunqAccount.status,
+                account_status: bunqAccount.status.toLowerCase(),
                 last_synced_at: new Date().toISOString(),
               })
               .eq('id', existingBunqAccount.account_id);
-          }
+            
+            syncedAccounts.push({
+              id: existingBunqAccount.id,
+              bunq_account_id: bunqAccount.id,
+              stratifi_account_id: existingBunqAccount.account_id,
+              action: 'updated',
+            });
+          } else {
+            // Create Stratifi account for existing Bunq account that doesn't have one
+            try {
+              const newAccount = await createAccount({
+                tenant_id: tenantId,
+                account_name: bunqAccount.description || displayName,
+                account_number: iban || bunqAccount.id.toString(),
+                account_type: 'checking', // Default to checking (lowercase)
+                account_status: bunqAccount.status.toLowerCase(),
+                bank_name: 'Bunq',
+                currency: bunqAccount.currency,
+                current_balance: formatBunqAmount(bunqAccount.balance),
+                external_account_id: bunqAccount.id.toString(),
+                sync_enabled: true,
+                last_synced_at: new Date().toISOString(),
+                created_by: user.id,
+              });
 
-          syncedAccounts.push({
-            id: existingBunqAccount.id,
-            bunq_account_id: bunqAccount.id,
-            action: 'updated',
-          });
+              // Link the accounts
+              await supabase
+                .from('bunq_accounts')
+                .update({ account_id: newAccount.id })
+                .eq('id', existingBunqAccount.id);
+
+              syncedAccounts.push({
+                id: existingBunqAccount.id,
+                bunq_account_id: bunqAccount.id,
+                stratifi_account_id: newAccount.id,
+                action: 'created_account',
+              });
+            } catch (accountError) {
+              console.error('Failed to create Stratifi account for existing Bunq account:', accountError);
+              errors.push({
+                bunq_account_id: bunqAccount.id,
+                error: `Failed to create Stratifi account: ${accountError instanceof Error ? accountError.message : 'Unknown error'}`,
+              });
+            }
+          }
         } else {
           // Create new Bunq account record
           const { data: newBunqAccount, error: createError } = await supabase
@@ -178,43 +216,35 @@ export async function POST(req: NextRequest) {
             throw createError;
           }
 
-          // Optionally create a corresponding Stratifi account
-          try {
-            const newAccount = await createAccount({
-              tenant_id: tenantId,
-              account_name: bunqAccount.description || displayName,
-              account_number: iban || bunqAccount.id.toString(),
-              account_type: 'Checking', // Default to checking
-              account_status: bunqAccount.status,
-              bank_name: 'Bunq',
-              currency: bunqAccount.currency,
-              current_balance: formatBunqAmount(bunqAccount.balance),
-              external_account_id: bunqAccount.id.toString(),
-              sync_enabled: true,
-              last_synced_at: new Date().toISOString(),
-              created_by: user.id,
-            });
+          // Always create a corresponding Stratifi account
+          const newAccount = await createAccount({
+            tenant_id: tenantId,
+            account_name: bunqAccount.description || displayName || `Bunq Account ${bunqAccount.id}`,
+            account_number: iban || bunqAccount.id.toString(),
+            account_type: 'checking', // Default to checking (lowercase to match UI)
+            account_status: bunqAccount.status.toLowerCase(),
+            bank_name: 'Bunq',
+            currency: bunqAccount.currency,
+            current_balance: formatBunqAmount(bunqAccount.balance),
+            available_balance: formatBunqAmount(bunqAccount.balance),
+            external_account_id: bunqAccount.id.toString(),
+            sync_enabled: true,
+            last_synced_at: new Date().toISOString(),
+            created_by: user.id,
+          });
 
-            // Link the accounts
-            await supabase
-              .from('bunq_accounts')
-              .update({ account_id: newAccount.id })
-              .eq('id', newBunqAccount.id);
+          // Link the accounts
+          await supabase
+            .from('bunq_accounts')
+            .update({ account_id: newAccount.id })
+            .eq('id', newBunqAccount.id);
 
-            syncedAccounts.push({
-              id: newBunqAccount.id,
-              bunq_account_id: bunqAccount.id,
-              stratifi_account_id: newAccount.id,
-              action: 'created',
-            });
-          } catch (accountError) {
-            console.error('Failed to create Stratifi account:', accountError);
-            syncedAccounts.push({
-              id: newBunqAccount.id,
-              bunq_account_id: bunqAccount.id,
-              action: 'created_without_stratifi_account',
-            });
-          }
+          syncedAccounts.push({
+            id: newBunqAccount.id,
+            bunq_account_id: bunqAccount.id,
+            stratifi_account_id: newAccount.id,
+            action: 'created',
+          });
         }
       } catch (error) {
         console.error(`Error processing account ${bunqAccount.id}:`, error);

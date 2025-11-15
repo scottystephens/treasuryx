@@ -7,9 +7,13 @@ import {
   exchangeCodeForToken,
   calculateExpirationDate,
   getUserInfo,
+  getMonetaryAccounts,
+  formatBunqAmount,
+  getPrimaryIban,
+  getDisplayName,
 } from '@/lib/bunq-client';
 import { supabase } from '@/lib/supabase';
-import { updateConnection } from '@/lib/supabase';
+import { updateConnection, createAccount } from '@/lib/supabase';
 
 export async function GET(req: NextRequest) {
   try {
@@ -124,10 +128,114 @@ export async function GET(req: NextRequest) {
         .update({ oauth_state: null })
         .eq('id', connection.id);
 
-      // Redirect to connection details page
+      // Automatically sync accounts after successful connection
+      // Do this in the background so OAuth callback completes quickly
+      (async () => {
+        try {
+          console.log('🔄 Auto-syncing accounts after OAuth connection...');
+          const monetaryAccounts = await getMonetaryAccounts(tokenResponse.access_token, bunqUserInfo.id);
+          
+          for (const bunqAccount of monetaryAccounts) {
+            try {
+              const iban = getPrimaryIban(bunqAccount.alias);
+              const displayName = getDisplayName(bunqAccount.alias);
+
+              // Check if Bunq account record exists
+              const { data: existingBunqAccount } = await supabase
+                .from('bunq_accounts')
+                .select('*')
+                .eq('connection_id', connection.id)
+                .eq('bunq_monetary_account_id', bunqAccount.id.toString())
+                .single();
+
+              let bunqAccountRecordId;
+              if (existingBunqAccount) {
+                bunqAccountRecordId = existingBunqAccount.id;
+                // Update existing record
+                await supabase
+                  .from('bunq_accounts')
+                  .update({
+                    description: bunqAccount.description,
+                    currency: bunqAccount.currency,
+                    balance: formatBunqAmount(bunqAccount.balance),
+                    iban: iban,
+                    display_name: displayName,
+                    status: bunqAccount.status.toLowerCase(),
+                    last_synced_at: new Date().toISOString(),
+                  })
+                  .eq('id', existingBunqAccount.id);
+              } else {
+                // Create new Bunq account record
+                const { data: newBunqAccount } = await supabase
+                  .from('bunq_accounts')
+                  .insert({
+                    tenant_id: connection.tenant_id,
+                    connection_id: connection.id,
+                    bunq_monetary_account_id: bunqAccount.id.toString(),
+                    bunq_account_type: 'MonetaryAccountBank',
+                    description: bunqAccount.description,
+                    currency: bunqAccount.currency,
+                    balance: formatBunqAmount(bunqAccount.balance),
+                    iban: iban,
+                    display_name: displayName,
+                    status: bunqAccount.status.toLowerCase(),
+                    last_synced_at: new Date().toISOString(),
+                  })
+                  .select()
+                  .single();
+                
+                bunqAccountRecordId = newBunqAccount?.id;
+              }
+
+              // Create Stratifi account if it doesn't exist
+              if (bunqAccountRecordId) {
+                const { data: bunqAccountRecord } = await supabase
+                  .from('bunq_accounts')
+                  .select('account_id')
+                  .eq('id', bunqAccountRecordId)
+                  .single();
+
+                if (!bunqAccountRecord?.account_id) {
+                  const newAccount = await createAccount({
+                    tenant_id: connection.tenant_id,
+                    account_name: bunqAccount.description || displayName || `Bunq Account ${bunqAccount.id}`,
+                    account_number: iban || bunqAccount.id.toString(),
+                    account_type: 'checking',
+                    account_status: bunqAccount.status.toLowerCase(),
+                    bank_name: 'Bunq',
+                    currency: bunqAccount.currency,
+                    current_balance: formatBunqAmount(bunqAccount.balance),
+                    available_balance: formatBunqAmount(bunqAccount.balance),
+                    external_account_id: bunqAccount.id.toString(),
+                    sync_enabled: true,
+                    last_synced_at: new Date().toISOString(),
+                    created_by: user.id,
+                  });
+
+                  // Link the accounts
+                  await supabase
+                    .from('bunq_accounts')
+                    .update({ account_id: newAccount.id })
+                    .eq('id', bunqAccountRecordId);
+                  
+                  console.log(`✅ Created Stratifi account: ${newAccount.account_name}`);
+                }
+              }
+            } catch (accountError) {
+              console.error(`Error syncing account ${bunqAccount.id}:`, accountError);
+            }
+          }
+          console.log('✅ Account sync completed');
+        } catch (syncError) {
+          // Log but don't fail the OAuth callback if sync fails
+          console.error('Background account sync failed:', syncError);
+        }
+      })();
+
+      // Redirect to connections page (accounts will appear after sync completes)
       return NextResponse.redirect(
         new URL(
-          `/connections/${connection.id}?success=true&message=Successfully connected to Bunq`,
+          `/connections?success=true&message=Successfully connected to Bunq. Accounts are being synced...`,
           req.url
         )
       );
