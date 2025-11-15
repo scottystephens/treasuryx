@@ -355,7 +355,7 @@ export default function ConnectionDetailPage() {
                 <Badge className={getHealthStatus(connection.sync_health_score).bgColor + ' ' + getHealthStatus(connection.sync_health_score).color}>
                   {getHealthStatus(connection.sync_health_score).label}
                 </Badge>
-                {connection.consecutive_failures > 0 && (
+                {connection.consecutive_failures !== undefined && connection.consecutive_failures > 0 && (
                   <p className="text-xs text-red-600 mt-1">
                     {connection.consecutive_failures} consecutive failures
                   </p>

@@ -654,6 +654,12 @@ export interface Account {
   created_at?: string
   updated_at?: string
   created_by?: string
+  // New fields from migration 11
+  provider_id?: string
+  connection_id?: string
+  iban?: string
+  bic?: string
+  account_holder_name?: string
 }
 
 export async function getAccountsByTenant(tenantId: string) {
