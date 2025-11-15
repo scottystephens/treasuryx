@@ -1,6 +1,8 @@
 // Tink API Client for Banking Aggregation
 // Documentation: https://docs.tink.com
 
+import crypto from 'crypto';
+
 // =====================================================
 // Types and Interfaces
 // =====================================================
