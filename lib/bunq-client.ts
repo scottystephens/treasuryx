@@ -315,27 +315,32 @@ async function bunqApiRequest<T>(
 ): Promise<T> {
   const url = `${BUNQ_CONFIG.apiBaseUrl}${endpoint}`;
   
-  // Bunq API requires POST for most endpoints, even for reading data
-  const method = options.method || 'POST';
+  // For OAuth-based API calls, Bunq uses GET for read operations
+  // (CloudFront only allows cacheable requests: GET/HEAD)
+  const method = options.method || 'GET';
   
-  const headers = {
+  const headers: Record<string, string> = {
     'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
     'X-Bunq-Client-Request-Id': crypto.randomUUID(),
     'X-Bunq-Geolocation': '0 0 0 0 NL', // Required by Bunq
     'X-Bunq-Language': 'en_US',
     'X-Bunq-Region': 'nl_NL',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
+  
+  // Only add Content-Type for POST/PUT requests
+  if (method !== 'GET' && method !== 'HEAD') {
+    headers['Content-Type'] = 'application/json';
+  }
   
   try {
     const response = await fetch(url, {
       method,
       ...options,
       headers,
-      // For GET requests, don't send body; for POST, send empty body if not provided
-      body: method === 'GET' ? undefined : (options.body || JSON.stringify({})),
+      // Don't send body for GET/HEAD requests
+      body: (method === 'GET' || method === 'HEAD') ? undefined : (options.body || JSON.stringify({})),
     });
     
     if (!response.ok) {
