@@ -192,39 +192,38 @@ export async function exchangeCodeForToken(
     throw new Error('Bunq configuration is incomplete');
   }
   
-  // Hybrid approach: Basic Auth for client credentials + query params for OAuth params
-  // (Bunq error said "Missing required GET parameter" suggesting query params)
-  const basicAuth = Buffer.from(
-    `${BUNQ_CONFIG.clientId}:${BUNQ_CONFIG.clientSecret}`
-  ).toString('base64');
-  
+  // Bunq's non-standard OAuth: ALL parameters in query string (including client_id/client_secret)
+  // Error "Missing required GET parameter" suggests everything should be in query params
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code: code,
     redirect_uri: BUNQ_CONFIG.redirectUri,
+    client_id: BUNQ_CONFIG.clientId,
+    client_secret: BUNQ_CONFIG.clientSecret,
   });
   
-  // Bunq wants parameters as query string (confirmed by error message)
+  // All parameters in query string
   const tokenUrl = `${BUNQ_CONFIG.tokenUrl}?${params.toString()}`;
   
   console.log('🔄 Exchanging code for token...');
-  console.log('Token URL:', BUNQ_CONFIG.tokenUrl);
+  console.log('Token URL (base):', BUNQ_CONFIG.tokenUrl);
   console.log('Redirect URI:', BUNQ_CONFIG.redirectUri);
   console.log('Client ID:', BUNQ_CONFIG.clientId?.substring(0, 20) + '...');
   console.log('Code:', code?.substring(0, 20) + '...');
-  console.log('Using Basic Auth + query params');
+  console.log('Using POST with ALL params in query string (Bunq non-standard)');
   
   try {
-    // Bunq's non-standard OAuth: POST with Basic Auth + query string params
+    // Bunq's non-standard OAuth: POST with ALL parameters in query string
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${basicAuth}`,
         'Cache-Control': 'no-cache',
+        'Accept': 'application/json',
       },
     });
     
     console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text();
