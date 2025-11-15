@@ -274,9 +274,18 @@ async function tinkApiRequest<T>(
       } catch {
         error = { message: errorText };
       }
-      throw new Error(
-        `Tink API error: ${error.message || error.error || response.statusText}`
-      );
+      
+      // Properly stringify error object for better error messages
+      const errorMessage = error.error_description || error.error || error.message || JSON.stringify(error) || response.statusText;
+      console.error(`❌ Tink API Error (${response.status}):`, {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        error: errorMessage,
+        fullError: error,
+      });
+      
+      throw new Error(`Tink API error: ${errorMessage}`);
     }
     
     const data = await response.json();

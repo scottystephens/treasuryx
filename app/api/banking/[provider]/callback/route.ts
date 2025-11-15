@@ -4,7 +4,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { getProvider } from '@/lib/banking-providers/provider-registry';
-import { supabase, updateConnection } from '@/lib/supabase';
+import {
+  supabase,
+  updateConnection,
+  createIngestionJob,
+  updateIngestionJob,
+  createAccount,
+} from '@/lib/supabase';
 
 export async function GET(
   req: NextRequest,
@@ -144,6 +150,141 @@ export async function GET(
         .update({ oauth_state: null })
         .eq('id', connection.id);
 
+      // Automatically sync accounts and transactions after successful OAuth
+      // This runs in the background and won't block the redirect
+      (async () => {
+        try {
+          console.log('Starting automatic sync after OAuth...');
+          
+          // Create ingestion job
+          const ingestionJob = await createIngestionJob({
+            tenant_id: connection.tenant_id,
+            connection_id: connection.id,
+            job_type: `${providerId}_sync`,
+            status: 'running',
+          });
+
+          // Get provider tokens (just stored above)
+          const { data: tokenData } = await supabase
+            .from('provider_tokens')
+            .select('*')
+            .eq('connection_id', connection.id)
+            .eq('provider_id', providerId)
+            .eq('status', 'active')
+            .single();
+
+          if (tokenData) {
+            const credentials = {
+              connectionId: connection.id,
+              tenantId: connection.tenant_id,
+              tokens: {
+                accessToken: tokenData.access_token,
+                refreshToken: tokenData.refresh_token || undefined,
+                expiresAt: tokenData.expires_at ? new Date(tokenData.expires_at) : undefined,
+                tokenType: tokenData.token_type || 'Bearer',
+                scope: tokenData.scopes,
+              },
+              metadata: tokenData.provider_metadata,
+            };
+
+            // Fetch accounts
+            try {
+              const providerAccounts = await provider.fetchAccounts(credentials);
+              let accountsSynced = 0;
+
+              for (const providerAccount of providerAccounts) {
+                try {
+                  const { data: existingAccount } = await supabase
+                    .from('provider_accounts')
+                    .select('*')
+                    .eq('connection_id', connection.id)
+                    .eq('provider_id', providerId)
+                    .eq('external_account_id', providerAccount.externalAccountId)
+                    .single();
+
+                  if (existingAccount) {
+                    await supabase
+                      .from('provider_accounts')
+                      .update({
+                        account_name: providerAccount.accountName,
+                        currency: providerAccount.currency,
+                        balance: providerAccount.balance,
+                        last_synced_at: new Date().toISOString(),
+                      })
+                      .eq('id', existingAccount.id);
+                  } else {
+                    const { data: newProviderAccount } = await supabase
+                      .from('provider_accounts')
+                      .insert({
+                        tenant_id: connection.tenant_id,
+                        connection_id: connection.id,
+                        provider_id: providerId,
+                        external_account_id: providerAccount.externalAccountId,
+                        account_name: providerAccount.accountName,
+                        account_number: providerAccount.accountNumber,
+                        account_type: providerAccount.accountType,
+                        currency: providerAccount.currency,
+                        balance: providerAccount.balance,
+                        iban: providerAccount.iban,
+                        status: providerAccount.status,
+                        provider_metadata: providerAccount.metadata || {},
+                        last_synced_at: new Date().toISOString(),
+                      })
+                      .select()
+                      .single();
+
+                    if (newProviderAccount) {
+                      const newAccount = await createAccount({
+                        tenant_id: connection.tenant_id,
+                        account_name: providerAccount.accountName,
+                        account_number: providerAccount.accountNumber || providerAccount.externalAccountId,
+                        account_type: providerAccount.accountType,
+                        account_status: providerAccount.status,
+                        bank_name: provider.config.displayName,
+                        currency: providerAccount.currency,
+                        current_balance: providerAccount.balance,
+                        external_account_id: providerAccount.externalAccountId,
+                        sync_enabled: true,
+                        last_synced_at: new Date().toISOString(),
+                        created_by: user.id,
+                      });
+
+                      await supabase
+                        .from('provider_accounts')
+                        .update({ account_id: newAccount.id })
+                        .eq('id', newProviderAccount.id);
+                    }
+                  }
+                  accountsSynced++;
+                } catch (accountError) {
+                  console.error('Error syncing account:', accountError);
+                }
+              }
+
+              // Update job
+              await updateIngestionJob(ingestionJob.id, {
+                status: 'completed',
+                records_fetched: accountsSynced,
+                records_imported: accountsSynced,
+                completed_at: new Date().toISOString(),
+              });
+
+              console.log(`✅ Automatic sync completed: ${accountsSynced} accounts synced`);
+            } catch (syncError) {
+              console.error('Automatic sync error:', syncError);
+              await updateIngestionJob(ingestionJob.id, {
+                status: 'failed',
+                error_message: syncError instanceof Error ? syncError.message : 'Unknown error',
+                completed_at: new Date().toISOString(),
+              });
+            }
+          }
+        } catch (syncError) {
+          // Don't fail the OAuth flow if sync fails - user can sync manually later
+          console.error('Automatic sync error (non-blocking):', syncError);
+        }
+      })();
+
       // Redirect to connection details page
       return NextResponse.redirect(
         new URL(
@@ -154,10 +295,20 @@ export async function GET(
     } catch (tokenError) {
       console.error('Error during token exchange or user info fetch:', tokenError);
 
+      // Properly format error message
+      let errorMessage = 'Unknown error';
+      if (tokenError instanceof Error) {
+        errorMessage = tokenError.message;
+      } else if (typeof tokenError === 'object' && tokenError !== null) {
+        errorMessage = JSON.stringify(tokenError);
+      } else {
+        errorMessage = String(tokenError);
+      }
+
       // Update connection with error
       await updateConnection(connection.tenant_id, connection.id, {
         status: 'error',
-        last_error: tokenError instanceof Error ? tokenError.message : 'Unknown error',
+        last_error: errorMessage,
       });
 
       return NextResponse.redirect(
