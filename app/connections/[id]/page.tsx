@@ -354,7 +354,7 @@ export default function ConnectionDetailPage() {
           <Card className="p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">Connected Accounts</h2>
             {accounts.length === 0 ? (
-              <p className="text-muted-foreground">No accounts synced yet. Click "Sync Now" to fetch accounts.</p>
+              <p className="text-muted-foreground">No accounts synced yet. Click &quot;Sync Now&quot; to fetch accounts.</p>
             ) : (
               <div className="space-y-4">
                 {accounts.map((account) => (
