@@ -23,6 +23,20 @@ TINK_REDIRECT_URI=http://localhost:3000/api/banking/tink/callback
 - **Console URL:** https://console.tink.com
 - **Documentation:** https://docs.tink.com
 
+### Redirect URI Configuration
+
+**IMPORTANT:** The redirect URI in Tink Console must match exactly:
+
+```
+https://stratifi-pi.vercel.app/api/banking/tink/callback
+```
+
+**Common mistakes to avoid:**
+- ❌ `https://stratifi-pi.vercel.app/connections` (wrong path)
+- ❌ `https://stratifi-pi.vercel.app/api/banking/tink/callback/` (trailing slash)
+- ❌ `http://stratifi-pi.vercel.app/api/banking/tink/callback` (http instead of https)
+- ✅ `https://stratifi-pi.vercel.app/api/banking/tink/callback` (correct)
+
 ## Next Steps
 
 1. ✅ Credentials saved

@@ -89,7 +89,8 @@ export interface TinkUser {
 const TINK_CONFIG = {
   clientId: process.env.TINK_CLIENT_ID!,
   clientSecret: process.env.TINK_CLIENT_SECRET!,
-  redirectUri: process.env.TINK_REDIRECT_URI!,
+  // Trim whitespace and newlines from redirect URI to prevent mismatches
+  redirectUri: process.env.TINK_REDIRECT_URI?.trim() || '',
   
   // API URLs
   apiBaseUrl: process.env.TINK_API_BASE_URL || 'https://api.tink.com',
