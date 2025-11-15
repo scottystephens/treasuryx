@@ -134,8 +134,22 @@ export async function GET(
         .single();
 
       if (tokenError || !tokenData) {
+        console.error('❌ Failed to store OAuth token:', {
+          error: tokenError,
+          connectionId: connection.id,
+          providerId,
+          tokenErrorDetails: tokenError?.message,
+          tokenErrorCode: tokenError?.code,
+        });
         throw new Error(`Failed to store OAuth token: ${tokenError?.message || 'Unknown error'}`);
       }
+      
+      console.log('✅ OAuth token stored successfully:', {
+        tokenId: tokenData.id,
+        connectionId: connection.id,
+        providerId,
+        hasRefreshToken: !!tokenData.refresh_token,
+      });
 
       // Update connection status
       await updateConnection(connection.tenant_id, connection.id, {

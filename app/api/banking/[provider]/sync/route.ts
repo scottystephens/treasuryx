@@ -81,7 +81,29 @@ export async function POST(
         .single();
 
       if (tokenError || !tokenData) {
-        throw new Error('OAuth token not found. Please reconnect your account.');
+        console.error('❌ Token lookup failed:', {
+          connectionId,
+          providerId,
+          error: tokenError,
+          tokenData,
+        });
+        
+        // Check if any tokens exist for this connection (for debugging)
+        const { data: allTokens, error: allTokensError } = await supabase
+          .from('provider_tokens')
+          .select('*')
+          .eq('connection_id', connectionId)
+          .eq('provider_id', providerId);
+        
+        console.error('🔍 All tokens for connection:', {
+          count: allTokens?.length || 0,
+          tokens: allTokens,
+          error: allTokensError,
+        });
+        
+        throw new Error(
+          `OAuth token not found. Please reconnect your account. ${tokenError?.message || ''}`
+        );
       }
 
       // Check if token needs refresh
