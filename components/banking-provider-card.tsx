@@ -63,8 +63,38 @@ export function BankingProviderCard({
         throw new Error(data.error || `Failed to connect to ${provider.displayName}`);
       }
 
-      // Redirect to provider's OAuth page
-      window.location.href = data.authorizationUrl;
+      // For Tink, open in popup window to force fresh session (no cached login)
+      // This ensures users always see the login screen
+      if (provider.id === 'tink') {
+        const popup = window.open(
+          data.authorizationUrl,
+          'tink-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+        
+        // Listen for popup to close or receive message
+        const checkClosed = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(checkClosed);
+            setIsConnecting(false);
+            // Reload page to show updated connection status
+            window.location.reload();
+          }
+        }, 500);
+        
+        // Listen for postMessage from callback (if implemented)
+        window.addEventListener('message', (event) => {
+          if (event.origin === window.location.origin && event.data === 'tink-oauth-success') {
+            popup?.close();
+            clearInterval(checkClosed);
+            setIsConnecting(false);
+            window.location.reload();
+          }
+        });
+      } else {
+        // For other providers, use standard redirect
+        window.location.href = data.authorizationUrl;
+      }
     } catch (error) {
       console.error('Provider connection error:', error);
       const errorMessage =

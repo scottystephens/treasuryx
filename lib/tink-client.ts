@@ -129,6 +129,10 @@ export function getTinkAuthorizationUrl(state: string, market: string = 'NL'): s
   console.log('   Redirect URI length:', TINK_CONFIG.redirectUri.length);
   console.log('   Client ID:', TINK_CONFIG.clientId);
   
+  // Add timestamp to make URL unique and prevent browser caching
+  const timestamp = Date.now();
+  const nonce = crypto.randomUUID();
+  
   const params = new URLSearchParams({
     client_id: TINK_CONFIG.clientId,
     redirect_uri: TINK_CONFIG.redirectUri,
@@ -136,7 +140,9 @@ export function getTinkAuthorizationUrl(state: string, market: string = 'NL'): s
     scope: 'accounts:read,transactions:read',
     state: state,
     market: market,
-    prompt: 'login', // Force login screen every time (don't use cached sessions)
+    prompt: 'login', // Try to force login (may not be supported by Tink)
+    _t: timestamp.toString(), // Timestamp to prevent caching
+    _n: nonce, // Nonce to make URL unique
   });
   
   const authUrl = `${TINK_CONFIG.authorizeUrl}?${params.toString()}`;
