@@ -120,7 +120,8 @@ const BUNQ_CONFIG = {
   tokenUrl: process.env.BUNQ_OAUTH_TOKEN_URL || 'https://oauth.bunq.com/token',
   
   // API Base URL
-  apiBaseUrl: process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com/v1',
+  // For OAuth, Bunq uses api.oauth.bunq.com instead of api.bunq.com
+  apiBaseUrl: process.env.BUNQ_API_BASE_URL || 'https://api.oauth.bunq.com/v1',
 };
 
 // Validate configuration
@@ -334,6 +335,9 @@ async function bunqApiRequest<T>(
     headers['Content-Type'] = 'application/json';
   }
   
+  console.log(`🌐 Bunq API Request: ${method} ${url}`);
+  console.log(`   Headers:`, Object.keys(headers).join(', '));
+  
   try {
     const response = await fetch(url, {
       method,
@@ -343,8 +347,13 @@ async function bunqApiRequest<T>(
       body: (method === 'GET' || method === 'HEAD') ? undefined : (options.body || JSON.stringify({})),
     });
     
+    console.log(`📡 Bunq API Response: ${response.status} ${response.statusText}`);
+    console.log(`   URL: ${response.url}`);
+    
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`❌ Bunq API Error Response:`, errorText.substring(0, 500));
+      
       let error;
       try {
         error = JSON.parse(errorText);
