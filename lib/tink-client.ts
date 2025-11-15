@@ -122,6 +122,12 @@ export function getTinkAuthorizationUrl(state: string, market: string = 'NL'): s
     throw new Error('Tink configuration is incomplete');
   }
   
+  // Log redirect URI for debugging
+  console.log('🔗 Tink OAuth Configuration:');
+  console.log('   Redirect URI:', TINK_CONFIG.redirectUri);
+  console.log('   Redirect URI length:', TINK_CONFIG.redirectUri.length);
+  console.log('   Client ID:', TINK_CONFIG.clientId);
+  
   const params = new URLSearchParams({
     client_id: TINK_CONFIG.clientId,
     redirect_uri: TINK_CONFIG.redirectUri,
@@ -131,7 +137,10 @@ export function getTinkAuthorizationUrl(state: string, market: string = 'NL'): s
     market: market,
   });
   
-  return `${TINK_CONFIG.authorizeUrl}?${params.toString()}`;
+  const authUrl = `${TINK_CONFIG.authorizeUrl}?${params.toString()}`;
+  console.log('   Authorization URL:', authUrl.substring(0, 200) + '...');
+  
+  return authUrl;
 }
 
 /**
