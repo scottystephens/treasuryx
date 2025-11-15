@@ -116,6 +116,14 @@ export async function GET(
 
       // Store OAuth tokens in generic provider_tokens table
       // Use upsert to handle case where token already exists (e.g., reconnection)
+      console.log('💾 Attempting to store OAuth token:', {
+        connectionId: connection.id,
+        providerId,
+        tenantId: connection.tenant_id,
+        hasAccessToken: !!tokens.accessToken,
+        hasRefreshToken: !!tokens.refreshToken,
+      });
+      
       const { data: tokenData, error: tokenError } = await supabase
         .from('provider_tokens')
         .upsert({
@@ -142,8 +150,11 @@ export async function GET(
           error: tokenError,
           connectionId: connection.id,
           providerId,
+          tenantId: connection.tenant_id,
           tokenErrorDetails: tokenError?.message,
           tokenErrorCode: tokenError?.code,
+          tokenErrorHint: tokenError?.hint,
+          fullError: JSON.stringify(tokenError),
         });
         throw new Error(`Failed to store OAuth token: ${tokenError?.message || 'Unknown error'}`);
       }
