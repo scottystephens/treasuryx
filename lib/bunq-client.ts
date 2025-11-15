@@ -207,9 +207,14 @@ export async function exchangeCodeForToken(
   
   console.log('🔄 Exchanging code for token...');
   console.log('Token URL (base):', BUNQ_CONFIG.tokenUrl);
+  console.log('Full Token URL (first 200 chars):', tokenUrl.substring(0, 200) + '...');
   console.log('Redirect URI:', BUNQ_CONFIG.redirectUri);
+  console.log('Redirect URI length:', BUNQ_CONFIG.redirectUri?.length);
   console.log('Client ID:', BUNQ_CONFIG.clientId?.substring(0, 20) + '...');
+  console.log('Client ID length:', BUNQ_CONFIG.clientId?.length);
+  console.log('Client Secret length:', BUNQ_CONFIG.clientSecret?.length);
   console.log('Code:', code?.substring(0, 20) + '...');
+  console.log('Code length:', code?.length);
   console.log('Using POST with ALL params in query string (Bunq non-standard)');
   
   try {
@@ -219,25 +224,32 @@ export async function exchangeCodeForToken(
       headers: {
         'Cache-Control': 'no-cache',
         'Accept': 'application/json',
+        'User-Agent': 'Stratifi/1.0',
       },
     });
     
     console.log('Response status:', response.status);
+    console.log('Response status text:', response.statusText);
     console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Error response body:', errorText);
+      console.error('❌ Full error response body:', errorText);
+      console.error('Error response length:', errorText.length);
       
       let error;
       try {
         error = JSON.parse(errorText);
-      } catch {
+        console.error('Parsed error object:', JSON.stringify(error, null, 2));
+      } catch (e) {
+        console.error('Could not parse error as JSON:', e);
         error = { error_description: errorText };
       }
       
+      // Include more details in error message
+      const errorMsg = error.error_description || error.error || error.message || response.statusText;
       throw new Error(
-        `Bunq token exchange failed: ${error.error_description || error.error || response.statusText}`
+        `Bunq API error: ${errorMsg} (Status: ${response.status})`
       );
     }
     
