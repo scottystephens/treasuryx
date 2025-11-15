@@ -117,7 +117,7 @@ const BUNQ_CONFIG = {
   
   // OAuth URLs
   authorizeUrl: process.env.BUNQ_OAUTH_AUTHORIZE_URL || 'https://oauth.bunq.com/auth',
-  tokenUrl: process.env.BUNQ_OAUTH_TOKEN_URL || 'https://api.oauth.bunq.com/v1/token',
+  tokenUrl: process.env.BUNQ_OAUTH_TOKEN_URL || 'https://oauth.bunq.com/token',
   
   // API Base URL
   apiBaseUrl: process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com/v1',
@@ -192,8 +192,7 @@ export async function exchangeCodeForToken(
     throw new Error('Bunq configuration is incomplete');
   }
   
-  // Bunq's non-standard OAuth: ALL parameters in query string (including client_id/client_secret)
-  // Error "Missing required GET parameter" suggests everything should be in query params
+  // Standard OAuth2: POST with form-encoded body (per Bunq docs)
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code: code,
@@ -202,12 +201,8 @@ export async function exchangeCodeForToken(
     client_secret: BUNQ_CONFIG.clientSecret,
   });
   
-  // All parameters in query string
-  const tokenUrl = `${BUNQ_CONFIG.tokenUrl}?${params.toString()}`;
-  
   console.log('🔄 Exchanging code for token...');
-  console.log('Token URL (base):', BUNQ_CONFIG.tokenUrl);
-  console.log('Full Token URL (first 200 chars):', tokenUrl.substring(0, 200) + '...');
+  console.log('Token URL:', BUNQ_CONFIG.tokenUrl);
   console.log('Redirect URI:', BUNQ_CONFIG.redirectUri);
   console.log('Redirect URI length:', BUNQ_CONFIG.redirectUri?.length);
   console.log('Client ID:', BUNQ_CONFIG.clientId?.substring(0, 20) + '...');
@@ -215,17 +210,19 @@ export async function exchangeCodeForToken(
   console.log('Client Secret length:', BUNQ_CONFIG.clientSecret?.length);
   console.log('Code:', code?.substring(0, 20) + '...');
   console.log('Code length:', code?.length);
-  console.log('Using POST with ALL params in query string (Bunq non-standard)');
+  console.log('Using standard OAuth2: POST with form-encoded body');
   
   try {
-    // Bunq's non-standard OAuth: POST with ALL parameters in query string
-    const response = await fetch(tokenUrl, {
+    // Standard OAuth2: POST with form-encoded body (per Bunq documentation)
+    const response = await fetch(BUNQ_CONFIG.tokenUrl, {
       method: 'POST',
       headers: {
-        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
         'User-Agent': 'Stratifi/1.0',
       },
+      body: params.toString(),
     });
     
     console.log('Response status:', response.status);
