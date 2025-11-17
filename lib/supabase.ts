@@ -485,7 +485,7 @@ export async function getIngestionJobs(tenantId: string, limit = 50) {
   try {
     const { data, error } = await supabase
       .from('ingestion_jobs')
-      .select('*, connections(name, connection_type)')
+      .select('*')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .limit(limit)
@@ -620,6 +620,7 @@ export interface Account {
   id?: string
   account_id?: string // Primary key in database
   tenant_id: string
+  entity_id?: string | null // Link to entity (optional)
   account_name: string
   account_number?: string
   account_type: string
@@ -629,6 +630,7 @@ export interface Account {
   branch_name?: string
   branch_code?: string
   currency?: string
+  balance?: number // Shorthand for current_balance (backward compatibility)
   opening_date?: string
   closing_date?: string
   interest_rate?: number
@@ -660,18 +662,60 @@ export interface Account {
   iban?: string
   bic?: string
   account_holder_name?: string
+  // Connection metadata (populated via join)
+  connections?: {
+    provider?: string
+    name?: string
+    status?: string
+  }
+  // Computed fields for UI convenience
+  connection_provider?: string
+  connection_name?: string
+  connection_status?: string
+  is_synced?: boolean // true if connection_id is not null
 }
 
-export async function getAccountsByTenant(tenantId: string) {
+export async function getAccountsByTenant(tenantId: string, includeConnection: boolean = true) {
   try {
-    const { data, error } = await supabase
+    // Build select query with optional connection join
+    let query = supabase
       .from('accounts')
-      .select('*')
+      .select(includeConnection 
+        ? `
+          *,
+          connections:connection_id(
+            provider,
+            name,
+            status
+          )
+        `
+        : '*'
+      )
       .eq('tenant_id', tenantId)
       .order('account_name')
 
+    const { data, error } = await query
+
     if (error) throw error
-    return data || []
+    
+    // Transform data to flatten connection metadata for easier UI access
+    const accounts = (data || []).map((account: any) => {
+      const result: Account = { ...account }
+      
+      // Flatten connection data for convenience
+      if (account.connections) {
+        result.connection_provider = account.connections.provider
+        result.connection_name = account.connections.name
+        result.connection_status = account.connections.status
+      }
+      
+      // Compute is_synced flag
+      result.is_synced = !!account.connection_id
+      
+      return result
+    })
+    
+    return accounts
   } catch (error) {
     console.error('Error fetching accounts:', error)
     throw error

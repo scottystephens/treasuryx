@@ -174,10 +174,12 @@ export async function createOrUpdateAccount(
         },
       };
 
+      // Use account_id for updates (it's the primary key)
+      const updateKey = existingAccount.account_id || existingAccount.id;
       const { data: updatedAccount, error: updateError } = await supabase
         .from('accounts')
         .update(updates)
-        .eq('id', existingAccount.id)
+        .eq('account_id', updateKey)
         .eq('tenant_id', tenantId)
         .select()
         .single();
@@ -196,16 +198,20 @@ export async function createOrUpdateAccount(
       };
     } else {
       // Create new account
-      const newAccount: Partial<Account> = {
+      // Generate account_id - use UUID format to match existing pattern
+      const accountId = crypto.randomUUID();
+      
+      const newAccount: any = {
+        account_id: accountId, // Required: account_id is the primary key
         tenant_id: tenantId,
         connection_id: connectionId,
         provider_id: providerId,
         account_name: providerAccount.accountName,
         account_number: providerAccount.accountNumber || providerAccount.externalAccountId,
-        account_type: providerAccount.accountType,
-        account_status: providerAccount.status,
-        currency: providerAccount.currency,
-        current_balance: providerAccount.balance,
+        account_type: providerAccount.accountType || 'checking',
+        account_status: providerAccount.status || 'active',
+        currency: providerAccount.currency || 'USD',
+        current_balance: providerAccount.balance || 0,
         external_account_id: providerAccount.externalAccountId,
         iban: providerAccount.iban,
         bic: providerAccount.bic,
@@ -218,6 +224,8 @@ export async function createOrUpdateAccount(
           created_via_provider: providerId,
           first_sync_at: now,
         },
+        // Handle legacy entity_id field - set to NULL if not provided (may need migration to make nullable)
+        entity_id: null, // Legacy field - provider accounts don't require entities
       };
 
       const { data: createdAccount, error: createError } = await supabase

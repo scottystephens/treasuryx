@@ -3,6 +3,10 @@
     {
       "path": "/api/exchange-rates/update",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/admin/cron/daily-bank-refresh",
+      "schedule": "0 2 * * *"
     }
   ]
 }

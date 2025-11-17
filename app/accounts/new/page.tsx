@@ -8,6 +8,7 @@ import { Navigation } from '@/components/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { useEntities } from '@/lib/hooks/use-entities';
 
 const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Checking Account' },
@@ -26,12 +27,16 @@ export default function NewAccountPage() {
   const { currentTenant } = useTenant();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
+  
+  // Fetch entities for dropdown
+  const { data: entities = [] } = useEntities(currentTenant?.id);
 
   // Basic fields
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountType, setAccountType] = useState('checking');
   const [currency, setCurrency] = useState('USD');
+  const [entityId, setEntityId] = useState<string>('');
   
   // Bank information
   const [bankName, setBankName] = useState('');
@@ -105,6 +110,7 @@ export default function NewAccountPage() {
         account_number: accountNumber || undefined,
         account_type: accountType,
         account_status: 'active',
+        entity_id: entityId || undefined, // Associate with entity if selected
         bank_name: bankName || undefined,
         bank_identifier: bankIdentifier || undefined,
         branch_name: branchName || undefined,
@@ -228,6 +234,25 @@ export default function NewAccountPage() {
                       className="w-full border rounded px-3 py-2"
                       placeholder="e.g., 1234567890"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block font-medium mb-2">Entity (Optional)</label>
+                    <select
+                      value={entityId}
+                      onChange={(e) => setEntityId(e.target.value)}
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      <option value="">No Entity</option>
+                      {entities.map((entity) => (
+                        <option key={entity.entity_id} value={entity.entity_id}>
+                          {entity.entity_name} ({entity.entity_id})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Associate this account with a legal entity
+                    </p>
                   </div>
 
                   <div>

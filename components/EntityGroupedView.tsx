@@ -1,0 +1,232 @@
+/**
+ * Entity Organization View - Grouped Card Layout
+ * Clear visual hierarchy showing entities and their accounts
+ * No external dependencies, pure CSS-based layout
+ */
+
+'use client';
+
+import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { Building2, Landmark, CreditCard, TrendingUp, ChevronRight } from 'lucide-react';
+import type { Entity } from '@/lib/types/entity';
+import type { Account } from '@/lib/supabase';
+
+interface EntityGroupedViewProps {
+  entities: Entity[];
+  accounts: Account[];
+  onEntityClick?: (entityId: string) => void;
+  onAccountClick?: (accountId: string) => void;
+}
+
+export function EntityGroupedView({
+  entities,
+  accounts,
+  onEntityClick,
+  onAccountClick,
+}: EntityGroupedViewProps) {
+  const router = useRouter();
+
+  // Group accounts by entity
+  const groupedData = useMemo(() => {
+    const accountsByEntity = accounts.reduce((acc, account) => {
+      const entityId = account.entity_id || 'unassigned';
+      if (!acc[entityId]) acc[entityId] = [];
+      acc[entityId].push(account);
+      return acc;
+    }, {} as Record<string, Account[]>);
+
+    // Add unassigned entity if there are accounts without entity
+    const entitiesWithUnassigned = [...entities];
+    if (accountsByEntity['unassigned']?.length > 0) {
+      entitiesWithUnassigned.push({
+        entity_id: 'unassigned',
+        entity_name: 'Unassigned Accounts',
+        type: 'Other',
+        jurisdiction: 'N/A',
+        status: 'Active',
+        tenant_id: entities[0]?.tenant_id || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as Entity);
+    }
+
+    return entitiesWithUnassigned.map(entity => {
+      const entityAccounts = accountsByEntity[entity.entity_id] || [];
+      const totalBalance = entityAccounts.reduce((sum, acc) => {
+        const balance = acc.balance ?? acc.current_balance ?? acc.available_balance ?? 0;
+        return sum + balance;
+      }, 0);
+      const currency = entityAccounts[0]?.currency || 'USD';
+
+      return {
+        entity,
+        accounts: entityAccounts,
+        totalBalance,
+        currency,
+      };
+    });
+  }, [entities, accounts]);
+
+  const formatCurrency = (amount: number, currency: string) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'Inactive':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'Dissolved':
+        return 'bg-red-100 text-red-800 border-red-300';
+      default:
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+    }
+  };
+
+  const getAccountIcon = (type: string) => {
+    const accountType = type?.toLowerCase() || '';
+    if (accountType.includes('credit')) return CreditCard;
+    if (accountType.includes('investment')) return TrendingUp;
+    return Landmark;
+  };
+
+  return (
+    <div className="space-y-8">
+      {groupedData.map(({ entity, accounts: entityAccounts, totalBalance, currency }) => (
+        <div
+          key={entity.entity_id}
+          className="border-2 border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+        >
+          {/* Entity Header */}
+          <div
+            className="bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200 p-6 cursor-pointer hover:from-blue-100 hover:to-blue-150 transition-colors"
+            onClick={() => onEntityClick?.(entity.entity_id)}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4 flex-1">
+                <div className="p-3 bg-blue-600 rounded-xl shadow-md">
+                  <Building2 className="h-8 w-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-2xl font-bold text-gray-900">{entity.entity_name}</h2>
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(
+                        entity.status
+                      )}`}
+                    >
+                      {entity.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-1">{entity.entity_id}</p>
+                  <p className="text-sm text-gray-600">
+                    {entity.type} • {entity.jurisdiction}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600 mb-1">Total Balance</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {formatCurrency(totalBalance, currency)}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {entityAccounts.length} account{entityAccounts.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Accounts Grid */}
+          {entityAccounts.length > 0 ? (
+            <div className="p-6 bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {entityAccounts.map((account) => {
+                  const balance = account.balance ?? account.current_balance ?? account.available_balance ?? 0;
+                  const accountCurrency = account.currency || 'USD';
+                  const Icon = getAccountIcon(account.account_type || '');
+                  const isSynced = !!account.connection_id;
+
+                  return (
+                    <div
+                      key={account.account_id || account.id}
+                      onClick={() => onAccountClick?.(account.account_id || account.id || '')}
+                      className={`relative p-4 rounded-lg border-2 cursor-pointer hover:shadow-lg transition-all ${
+                        isSynced
+                          ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300 hover:border-green-400'
+                          : 'bg-white border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {/* Account Header */}
+                      <div className="flex items-start gap-3 mb-3">
+                        <div
+                          className={`p-2 rounded-lg ${
+                            isSynced ? 'bg-green-600' : 'bg-gray-600'
+                          }`}
+                        >
+                          <Icon className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm text-gray-900 truncate">
+                            {account.account_name}
+                          </h3>
+                          <p className="text-xs text-gray-600 truncate">
+                            {account.bank_name || account.account_number || account.iban || account.external_account_id || 'No bank'}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      </div>
+
+                      {/* Account Details */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs text-gray-600">
+                          <span className="capitalize">{account.account_type || 'Unknown'}</span>
+                          <span className="font-mono">{accountCurrency}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-lg font-bold ${balance >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
+                            {formatCurrency(balance, accountCurrency)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Sync Badge */}
+                      {isSynced && (
+                        <div className="absolute top-2 right-2">
+                          <div className="flex items-center gap-1 px-2 py-1 bg-green-600 rounded-full">
+                            <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
+                            <span className="text-xs text-white font-medium">Synced</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-gray-500">
+              <Landmark className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+              <p className="text-sm">No accounts linked to this entity</p>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {groupedData.length === 0 && (
+        <div className="text-center py-12">
+          <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Entities Found</h3>
+          <p className="text-gray-600">Create an entity to organize your accounts.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+

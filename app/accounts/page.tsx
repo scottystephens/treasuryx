@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
 import { useAuth } from '@/lib/auth-context';
@@ -8,41 +8,48 @@ import { Navigation } from '@/components/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Building, Trash2, Edit, DollarSign, TrendingUp } from 'lucide-react';
+import { Plus, Building, Trash2, Edit, DollarSign, TrendingUp, Filter } from 'lucide-react';
 import type { Account } from '@/lib/supabase';
+import { ProviderBadge } from '@/components/ui/provider-badge';
+import { AccountSourceIndicator } from '@/components/ui/account-source-indicator';
+import { useAccounts, useDeleteAccount } from '@/lib/hooks/use-accounts';
+import { toast } from 'sonner';
+
+type FilterType = 'all' | 'synced' | 'manual' | string; // string for provider name
 
 export default function AccountsPage() {
   const router = useRouter();
   const { currentTenant } = useTenant();
   const { user } = useAuth();
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [filter, setFilter] = useState<FilterType>('all');
+  
+  // Use React Query hook for accounts
+  const { data: accounts = [], isLoading: loading, error } = useAccounts(currentTenant?.id);
+  const deleteAccountMutation = useDeleteAccount();
 
+  // Filter accounts based on selected filter (memoized for performance)
+  const filteredAccounts = useMemo(() => {
+    if (filter === 'all') {
+      return accounts;
+    } else if (filter === 'synced') {
+      return accounts.filter(acc => acc.is_synced);
+    } else if (filter === 'manual') {
+      return accounts.filter(acc => !acc.is_synced);
+    } else {
+      // Filter by provider
+      return accounts.filter(acc => acc.connection_provider === filter);
+    }
+  }, [accounts, filter]);
+
+  // Show error toast if query fails
   useEffect(() => {
-    if (currentTenant) {
-      loadAccounts();
+    if (error) {
+      toast.error('Failed to load accounts', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
-  }, [currentTenant]);
-
-  async function loadAccounts() {
-    if (!currentTenant) return;
-
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/accounts?tenantId=${currentTenant.id}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setAccounts(data.accounts);
-      }
-    } catch (error) {
-      console.error('Error loading accounts:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [error]);
 
   async function handleDelete(accountId: string) {
     if (!currentTenant) return;
@@ -50,24 +57,10 @@ export default function AccountsPage() {
       return;
     }
 
-    try {
-      setDeleting(accountId);
-      const response = await fetch(
-        `/api/accounts?id=${accountId}&tenantId=${currentTenant.id}`,
-        { method: 'DELETE' }
-      );
-
-      if (response.ok) {
-        setAccounts(accounts.filter((a) => a.id !== accountId));
-      } else {
-        alert('Failed to delete account');
-      }
-    } catch (error) {
-      console.error('Error deleting account:', error);
-      alert('Failed to delete account');
-    } finally {
-      setDeleting(null);
-    }
+    deleteAccountMutation.mutate({
+      accountId,
+      tenantId: currentTenant.id,
+    });
   }
 
   function getAccountTypeColor(type: string) {
@@ -121,7 +114,7 @@ export default function AccountsPage() {
       <Navigation />
 
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="max-w-[1600px] mx-auto px-6 py-6">
+        <div className="p-8">
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -139,6 +132,50 @@ export default function AccountsPage() {
             </Button>
           </div>
 
+          {/* Filter Bar */}
+          {!loading && accounts.length > 0 && (
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Filter className="h-4 w-4" />
+                <span>Filter:</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={filter === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilter('all')}
+                >
+                  All ({accounts.length})
+                </Button>
+                <Button
+                  variant={filter === 'synced' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilter('synced')}
+                >
+                  Synced ({accounts.filter(acc => acc.is_synced).length})
+                </Button>
+                <Button
+                  variant={filter === 'manual' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilter('manual')}
+                >
+                  Manual ({accounts.filter(acc => !acc.is_synced).length})
+                </Button>
+                {/* Provider filters */}
+                {Array.from(new Set(accounts.map(acc => acc.connection_provider).filter(Boolean))).map((provider) => (
+                  <Button
+                    key={provider}
+                    variant={filter === provider ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFilter(provider!)}
+                  >
+                    {provider === 'tink' ? 'Tink' : provider === 'bunq' ? 'Bunq' : provider} ({accounts.filter(acc => acc.connection_provider === provider).length})
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Loading State */}
           {loading && (
             <div className="text-center py-12">
@@ -147,7 +184,7 @@ export default function AccountsPage() {
           )}
 
           {/* Empty State */}
-          {!loading && accounts.length === 0 && (
+          {!loading && filteredAccounts.length === 0 && accounts.length === 0 && (
             <Card className="p-12 text-center">
               <div className="flex justify-center mb-4">
                 <Building className="h-16 w-16 text-muted-foreground" />
@@ -163,20 +200,54 @@ export default function AccountsPage() {
             </Card>
           )}
 
+          {/* Filtered Empty State */}
+          {!loading && filteredAccounts.length === 0 && accounts.length > 0 && (
+            <Card className="p-12 text-center">
+              <div className="flex justify-center mb-4">
+                <Filter className="h-16 w-16 text-muted-foreground" />
+              </div>
+              <h2 className="text-2xl font-semibold mb-2">No accounts match this filter</h2>
+              <p className="text-muted-foreground mb-6">
+                Try selecting a different filter or create a new account
+              </p>
+              <Button onClick={() => setFilter('all')}>
+                Show All Accounts
+              </Button>
+            </Card>
+          )}
+
           {/* Accounts Grid */}
-          {!loading && accounts.length > 0 && (
+          {!loading && filteredAccounts.length > 0 && (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {accounts.map((account) => (
+              {filteredAccounts.map((account) => (
                 <Card key={account.account_id || account.id} className="p-6 hover:shadow-lg transition-shadow">
+                  {/* Provider and Source Badges */}
+                  <div className="flex items-center gap-2 mb-3">
+                    {account.connection_provider && (
+                      <ProviderBadge
+                        provider={account.connection_provider}
+                        connectionName={account.connection_name}
+                        connectionId={account.connection_id}
+                        showLink={!!account.connection_id}
+                      />
+                    )}
+                    <AccountSourceIndicator isSynced={!!account.connection_id} />
+                  </div>
+
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1">
                       <div className="p-2 bg-blue-100 rounded-lg">
                         <Building className="h-5 w-5 text-blue-600" />
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <h3 className="font-semibold">{account.account_name}</h3>
+                        {account.connection_name && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Via: {account.connection_name}
+                          </p>
+                        )}
                         {account.account_number && (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground mt-1">
                             •••• {account.account_number.slice(-4)}
                           </p>
                         )}
@@ -186,7 +257,8 @@ export default function AccountsPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(account.account_id || account.id!)}
-                      disabled={deleting === (account.account_id || account.id)}
+                      disabled={deleteAccountMutation.isPending}
+                      className="flex-shrink-0"
                     >
                       <Trash2 className="h-4 w-4 text-red-600" />
                     </Button>

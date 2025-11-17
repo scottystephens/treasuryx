@@ -20,6 +20,11 @@ import {
   recordSyncFailure,
   type SyncSummary,
 } from '@/lib/services/connection-metadata-service';
+import {
+  determineSyncDateRange,
+  calculateSyncMetrics,
+  formatSyncMetrics,
+} from '@/lib/services/transaction-sync-service';
 
 export async function GET(
   req: NextRequest,
@@ -287,14 +292,11 @@ export async function GET(
                 syncSummary.warnings.push(`${closedCount} accounts marked as closed`);
               }
 
-              // Optional: Sync initial transactions (last 30 days for first sync)
+              // Optional: Sync initial transactions using intelligent sync
               // Only if provider supports transactions
               if (provider.config.supportsSync) {
                 try {
-                  console.log('💳 Starting initial transaction sync (last 30 days)...');
-                  
-                  const endDate = new Date();
-                  const startDate = new Date(endDate.getTime() - (30 * 24 * 60 * 60 * 1000)); // 30 days back
+                  console.log('💳 Starting initial transaction sync...');
                   
                   let transactionsCount = 0;
 
@@ -312,55 +314,102 @@ export async function GET(
 
                       if (!providerAccount) continue;
 
+                      // Use intelligent sync for initial backfill
+                      const dateRange = await determineSyncDateRange(
+                        result.account.account_id,
+                        connection.id,
+                        result.account.account_type || 'checking',
+                        true // Force initial sync
+                      );
+
+                      const metrics = calculateSyncMetrics(dateRange);
+                      console.log(`  📊 ${result.account.account_name}: ${formatSyncMetrics(metrics)}`);
+
                       const transactions = await provider.fetchTransactions(
                         credentials,
                         providerAccount.external_account_id,
                         { 
-                          startDate, 
-                          endDate, 
-                          limit: 100, // Limit initial sync per account
+                          startDate: dateRange.startDate, 
+                          endDate: dateRange.endDate, 
+                          limit: 500, // Higher limit for initial sync
                         }
                       );
 
                       // Import transactions
                       for (const transaction of transactions) {
                         try {
-                          await supabase.from('provider_transactions').upsert({
-                            tenant_id: connection.tenant_id,
-                            connection_id: connection.id,
-                            provider_id: providerId,
-                            provider_account_id: providerAccount.id,
-                            external_transaction_id: transaction.externalTransactionId,
-                            external_account_id: providerAccount.external_account_id,
-                            amount: transaction.amount,
-                            currency: transaction.currency,
-                            description: transaction.description,
-                            transaction_type: transaction.type,
-                            counterparty_name: transaction.counterpartyName,
-                            transaction_date: transaction.date.toISOString(),
-                            import_status: 'pending',
-                            import_job_id: ingestionJob.id,
-                            provider_metadata: transaction.metadata || {},
-                          }, {
-                            onConflict: 'connection_id,provider_id,external_transaction_id',
-                          });
+                          // Generate consistent transaction_id
+                          const transactionId = `${providerId}_${connection.id}_${transaction.externalTransactionId}`;
+                          
+                          // ✨ STEP 1: Store in provider_transactions with complete metadata
+                          const { data: providerTxData } = await supabase
+                            .from('provider_transactions')
+                            .upsert({
+                              tenant_id: connection.tenant_id,
+                              connection_id: connection.id,
+                              provider_id: providerId,
+                              provider_account_id: providerAccount.id,
+                              external_transaction_id: transaction.externalTransactionId,
+                              external_account_id: providerAccount.external_account_id,
+                              amount: transaction.amount,
+                              currency: transaction.currency,
+                              description: transaction.description,
+                              transaction_type: transaction.type,
+                              counterparty_name: transaction.counterpartyName,
+                              transaction_date: transaction.date.toISOString(),
+                              import_status: 'pending',
+                              import_job_id: ingestionJob.id,
+                              // ✨ Store COMPLETE metadata
+                              provider_metadata: transaction.metadata || {},
+                              // ✨ Link to main transaction
+                              transaction_id: transactionId,
+                            }, {
+                              onConflict: 'connection_id,provider_id,external_transaction_id',
+                            })
+                            .select()
+                            .single();
 
-                          // Import to main transactions table
-                          await supabase.from('transactions').upsert({
-                            tenant_id: connection.tenant_id,
-                            account_id: result.account.id,
-                            transaction_date: transaction.date.toISOString(),
-                            amount: transaction.type === 'credit' ? transaction.amount : -transaction.amount,
-                            currency: transaction.currency,
-                            description: transaction.description,
-                            transaction_type: transaction.type === 'credit' ? 'Credit' : 'Debit',
-                            connection_id: connection.id,
-                            external_transaction_id: transaction.externalTransactionId,
-                            source_type: `${providerId}_api`,
-                            import_job_id: ingestionJob.id,
-                          }, {
-                            onConflict: 'tenant_id,connection_id,external_transaction_id',
-                          });
+                          // ✨ STEP 2: Import to main transactions table
+                          const { data: mainTxData } = await supabase
+                            .from('transactions')
+                            .upsert({
+                              transaction_id: transactionId,
+                              tenant_id: connection.tenant_id,
+                              account_id: result.account.account_id, // Use TEXT account_id, not UUID id
+                              date: transaction.date.toISOString().split('T')[0], // Use 'date' column, format as YYYY-MM-DD
+                              amount: transaction.type === 'credit' ? transaction.amount : -transaction.amount,
+                              currency: transaction.currency,
+                              description: transaction.description,
+                              type: transaction.type === 'credit' ? 'Credit' : 'Debit', // Use 'type' column, not 'transaction_type'
+                              category: transaction.category || 'Uncategorized',
+                              status: 'Completed',
+                              connection_id: connection.id,
+                              external_transaction_id: transaction.externalTransactionId,
+                              source_type: `${providerId}_api`,
+                              import_job_id: ingestionJob.id,
+                              metadata: {
+                                counterparty_name: transaction.counterpartyName,
+                                counterparty_account: transaction.counterpartyAccount,
+                                reference: transaction.reference,
+                                provider_id: providerId,
+                                ...transaction.metadata,
+                              },
+                            }, {
+                              onConflict: 'transaction_id',
+                            })
+                            .select()
+                            .single();
+
+                          // ✨ STEP 3: Update provider_transactions to mark as imported
+                          if (mainTxData && providerTxData) {
+                            await supabase
+                              .from('provider_transactions')
+                              .update({
+                                import_status: 'imported',
+                                transaction_id: mainTxData.transaction_id,
+                              })
+                              .eq('id', providerTxData.id);
+                          }
 
                           transactionsCount++;
                         } catch (txError) {

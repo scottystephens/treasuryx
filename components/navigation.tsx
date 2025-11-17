@@ -18,7 +18,8 @@ import {
   UserCircle2,
   Database,
   Menu,
-  X
+  X,
+  Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTenant } from '@/lib/tenant-context'
@@ -39,7 +40,7 @@ const navigation = [
 export function Navigation() {
   const pathname = usePathname()
   const { currentTenant, userTenants, switchTenant, userRole } = useTenant()
-  const { user, signOut } = useAuth()
+  const { user, isSuperAdmin, signOut } = useAuth()
   const [tenantMenuOpen, setTenantMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -175,6 +176,26 @@ export function Navigation() {
 
       {/* Bottom Menu */}
       <div className="border-t">
+        {/* Admin Link (Super Admins Only) */}
+        {isSuperAdmin && (
+          <div className="p-3 space-y-1 border-b">
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isCollapsed ? "justify-center" : "space-x-3",
+                pathname?.startsWith('/admin')
+                  ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                  : 'text-amber-700 bg-amber-50 hover:bg-amber-100'
+              )}
+              title={isCollapsed ? "Admin Dashboard" : undefined}
+            >
+              <Shield className="h-5 w-5 flex-shrink-0" />
+              {!isCollapsed && <span>Admin Dashboard</span>}
+            </Link>
+          </div>
+        )}
+
         {/* Settings & Team */}
         <div className="p-3 space-y-1">
           <Link

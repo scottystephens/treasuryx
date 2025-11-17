@@ -31,7 +31,14 @@ export async function GET(req: NextRequest) {
     if (accountId) {
       const { data, error } = await supabase
         .from('accounts')
-        .select('*')
+        .select(`
+          *,
+          connections:connection_id(
+            provider,
+            name,
+            status
+          )
+        `)
         .eq('tenant_id', tenantId)
         .eq('account_id', accountId) // Use account_id (primary key in database)
         .single();
@@ -40,7 +47,16 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, account: data });
+      // Flatten connection data for consistency
+      const account: Account = { ...data }
+      if (data.connections) {
+        account.connection_provider = data.connections.provider
+        account.connection_name = data.connections.name
+        account.connection_status = data.connections.status
+      }
+      account.is_synced = !!data.connection_id
+
+      return NextResponse.json({ success: true, account });
     } else {
       const accounts = await getAccountsByTenant(tenantId);
       return NextResponse.json({ success: true, accounts });
@@ -64,6 +80,11 @@ export async function POST(req: NextRequest) {
         { error: 'Missing required fields: tenant_id, account_name, account_type' },
         { status: 400 }
       );
+    }
+
+    // Handle entity_id: convert empty string to null
+    if ('entity_id' in account && account.entity_id === '') {
+      account.entity_id = null;
     }
 
     const newAccount = await createAccount(account);
@@ -91,6 +112,11 @@ export async function PATCH(req: NextRequest) {
         { error: 'Account ID and Tenant ID are required' },
         { status: 400 }
       );
+    }
+
+    // Handle entity_id: convert empty string to null
+    if ('entity_id' in updates && updates.entity_id === '') {
+      updates.entity_id = null;
     }
 
     // Update using account_id field

@@ -261,6 +261,10 @@ const canEdit = ['owner', 'admin'].includes(userRole);
 - **Shared tables:** No tenant_id (e.g., exchange_rates)
 - **Always include:** `created_at`, `updated_at` timestamps
 - **Use UUIDs** for primary keys (except lookup tables)
+- **Text fields:** ALWAYS use `TEXT` type (unlimited) - NEVER use `VARCHAR(n)` with length restrictions
+  - Prevents field length errors and provides maximum flexibility
+  - Migration 14 removed all existing VARCHAR(n) restrictions
+  - Exception: Only use length limits for validation CHECK constraints or where PostgreSQL requires it
 
 ### RLS Policies
 When creating new tenant-scoped tables:

@@ -9,6 +9,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
 import type { Account } from '@/lib/supabase';
+import { useEntities } from '@/lib/hooks/use-entities';
+import { useAccount } from '@/lib/hooks/use-accounts';
+import { toast } from 'sonner';
 
 const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Checking Account' },
@@ -27,41 +30,24 @@ export default function EditAccountPage() {
   const params = useParams();
   const { currentTenant } = useTenant();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
 
   const accountId = params.id as string;
 
+  // Use React Query hooks
+  const { data: accountData, isLoading: loading } = useAccount(currentTenant?.id, accountId);
+  const { data: entities = [] } = useEntities(currentTenant?.id);
+
+  // Update local state when account data loads
   useEffect(() => {
-    if (currentTenant && accountId) {
-      loadAccount();
+    if (accountData) {
+      setAccount(accountData);
+    } else if (!loading && currentTenant) {
+      toast.error('Account not found');
+      router.push('/accounts');
     }
-  }, [currentTenant, accountId]);
-
-  async function loadAccount() {
-    if (!currentTenant) return;
-
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `/api/accounts?tenantId=${currentTenant.id}&id=${accountId}`
-      );
-      const data = await response.json();
-
-      if (data.success && data.account) {
-        setAccount(data.account);
-      } else {
-        alert('Account not found');
-        router.push('/accounts');
-      }
-    } catch (error) {
-      console.error('Error loading account:', error);
-      alert('Failed to load account');
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [accountData, loading, currentTenant, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,14 +69,18 @@ export default function EditAccountPage() {
       const data = await response.json();
 
       if (data.success) {
-        alert('Account updated successfully!');
+        toast.success('Account updated successfully!');
         router.push('/accounts');
       } else {
-        alert(`Failed to update account: ${data.error}`);
+        toast.error('Failed to update account', {
+          description: data.error || 'Unknown error',
+        });
       }
     } catch (error) {
       console.error('Error updating account:', error);
-      alert('Failed to update account');
+      toast.error('Failed to update account', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
     } finally {
       setSaving(false);
     }
@@ -208,6 +198,27 @@ export default function EditAccountPage() {
                       }
                       className="w-full border rounded px-3 py-2"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block font-medium mb-2">Entity (Optional)</label>
+                    <select
+                      value={account.entity_id || ''}
+                      onChange={(e) =>
+                        setAccount({ ...account, entity_id: e.target.value || null })
+                      }
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      <option value="">No Entity</option>
+                      {entities.map((entity) => (
+                        <option key={entity.entity_id} value={entity.entity_id}>
+                          {entity.entity_name} ({entity.entity_id})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Associate this account with a legal entity
+                    </p>
                   </div>
 
                   <div>
@@ -391,37 +402,119 @@ export default function EditAccountPage() {
               </Card>
 
               {/* Custom Fields */}
-              {account.custom_fields && (
-                <Card className="p-6">
-                  <h2 className="text-xl font-semibold mb-4">Custom Fields</h2>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Custom fields for this account
-                  </p>
-                  <div className="space-y-3">
-                    {Object.entries(account.custom_fields).map(([key, value]: [string, any]) => (
-                      <div key={key} className="grid grid-cols-2 gap-4">
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Custom Fields</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Custom fields for this account
+                </p>
+                
+                {/* Provider Metadata (Read-Only) */}
+                {account.custom_fields?.provider_metadata && (
+                  <div className="mb-6 p-4 bg-muted/30 rounded-lg">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                        {account.custom_fields.created_via_provider || 'Provider'}
+                      </span>
+                      Provider Account Information
+                    </h3>
+                    <div className="grid gap-3 md:grid-cols-2 text-sm">
+                      {account.custom_fields.provider_metadata.tink_account_type && (
                         <div>
-                          <label className="block text-sm font-medium mb-1">
-                            {value.label || key}
-                          </label>
+                          <span className="text-muted-foreground">Account Type:</span>
+                          <span className="ml-2 font-medium">
+                            {account.custom_fields.provider_metadata.tink_account_type}
+                          </span>
                         </div>
+                      )}
+                      {account.custom_fields.provider_metadata.financial_institution_id && (
                         <div>
-                          <input
-                            type="text"
-                            value={value.value || ''}
-                            onChange={(e) => {
-                              const updated = { ...account.custom_fields };
-                              updated[key] = { ...value, value: e.target.value };
-                              setAccount({ ...account, custom_fields: updated });
-                            }}
-                            className="w-full border rounded px-3 py-2"
-                          />
+                          <span className="text-muted-foreground">Institution ID:</span>
+                          <span className="ml-2 font-medium font-mono text-xs">
+                            {account.custom_fields.provider_metadata.financial_institution_id}
+                          </span>
                         </div>
-                      </div>
-                    ))}
+                      )}
+                      {account.custom_fields.provider_metadata.holder_name && (
+                        <div>
+                          <span className="text-muted-foreground">Account Holder:</span>
+                          <span className="ml-2 font-medium">
+                            {account.custom_fields.provider_metadata.holder_name}
+                          </span>
+                        </div>
+                      )}
+                      {account.custom_fields.first_sync_at && (
+                        <div>
+                          <span className="text-muted-foreground">First Synced:</span>
+                          <span className="ml-2 font-medium">
+                            {new Date(account.custom_fields.first_sync_at).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {account.custom_fields.last_provider_sync && (
+                        <div>
+                          <span className="text-muted-foreground">Last Provider Sync:</span>
+                          <span className="ml-2 font-medium">
+                            {new Date(account.custom_fields.last_provider_sync).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {account.custom_fields.provider_metadata.refreshed && (
+                        <div>
+                          <span className="text-muted-foreground">Last Refreshed:</span>
+                          <span className="ml-2 font-medium">
+                            {new Date(account.custom_fields.provider_metadata.refreshed * 1000).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {account.custom_fields.provider_metadata.flags && account.custom_fields.provider_metadata.flags.length > 0 && (
+                        <div className="md:col-span-2">
+                          <span className="text-muted-foreground">Flags:</span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {account.custom_fields.provider_metadata.flags.map((flag: string) => (
+                              <span key={flag} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
+                                {flag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </Card>
-              )}
+                )}
+                
+                {/* Editable Custom Fields */}
+                {account.custom_fields && Object.keys(account.custom_fields).length > 0 && (
+                  <div className="space-y-3">
+                    {Object.entries(account.custom_fields)
+                      .filter(([key]) => !['provider_metadata', 'created_via_provider', 'first_sync_at', 'last_provider_sync'].includes(key))
+                      .map(([key, value]: [string, any]) => (
+                        <div key={key} className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1">
+                              {typeof value === 'object' && value.label ? value.label : key}
+                            </label>
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              value={typeof value === 'object' && 'value' in value ? value.value : value}
+                              onChange={(e) => {
+                                const updated = { ...account.custom_fields };
+                                if (typeof value === 'object' && 'value' in value) {
+                                  updated[key] = { ...value, value: e.target.value };
+                                } else {
+                                  updated[key] = e.target.value;
+                                }
+                                setAccount({ ...account, custom_fields: updated });
+                              }}
+                              className="w-full border rounded px-3 py-2"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </Card>
 
               {/* Notes */}
               <Card className="p-6">

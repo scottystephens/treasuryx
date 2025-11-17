@@ -109,7 +109,7 @@ export default function ConnectionHistoryPage() {
     <div className="flex h-screen">
       <Navigation />
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="max-w-[1600px] mx-auto px-6 py-6">
+        <div className="p-8">
           {/* Header */}
           <div className="mb-8">
             <Button

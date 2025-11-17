@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, RefreshCw, Trash2, CheckCircle2, AlertCircle, Clock, Building2, CreditCard, TrendingUp, Activity, Zap, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
+import { useConnection, useSyncConnection, useDeleteConnection } from '@/lib/hooks/use-connections';
 
 interface Connection {
   id: string;
@@ -95,117 +97,75 @@ export default function ConnectionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { currentTenant } = useTenant();
-  const [connection, setConnection] = useState<Connection | null>(null);
   const [token, setToken] = useState<ProviderToken | null>(null);
   const [accounts, setAccounts] = useState<ProviderAccount[]>([]);
   const [jobs, setJobs] = useState<IngestionJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const connectionId = params.id as string;
 
+  // Use React Query for connection data
+  const { data: connection, isLoading: loading } = useConnection(currentTenant?.id, connectionId);
+  const syncMutation = useSyncConnection();
+  const deleteMutation = useDeleteConnection();
+
+  // Load additional data (token, accounts, jobs) - these can be cached separately
   useEffect(() => {
-    if (currentTenant && connectionId) {
-      loadConnectionDetails();
-    }
+    if (!currentTenant || !connectionId) return;
+
+    // Load provider token
+    fetch(`/api/banking/tokens?connectionId=${connectionId}&tenantId=${currentTenant.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.token) {
+          setToken(data.token);
+        }
+      })
+      .catch(console.error);
+
+    // Load provider accounts
+    fetch(`/api/banking/accounts?connectionId=${connectionId}&tenantId=${currentTenant.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setAccounts(data.accounts || []);
+        }
+      })
+      .catch(console.error);
+
+    // Load ingestion jobs
+    fetch(`/api/connections/jobs?connectionId=${connectionId}&tenantId=${currentTenant.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setJobs(data.jobs || []);
+        }
+      })
+      .catch(console.error);
   }, [currentTenant, connectionId]);
-
-  async function loadConnectionDetails() {
-    if (!currentTenant) return;
-
-    try {
-      setLoading(true);
-
-      // Load connection
-      const connResponse = await fetch(`/api/connections?tenantId=${currentTenant.id}`);
-      const connData = await connResponse.json();
-      if (connData.success) {
-        const conn = connData.connections.find((c: Connection) => c.id === connectionId);
-        setConnection(conn || null);
-      }
-
-      // Load provider token
-      const tokenResponse = await fetch(`/api/banking/tokens?connectionId=${connectionId}&tenantId=${currentTenant.id}`);
-      const tokenData = await tokenResponse.json();
-      if (tokenData.success && tokenData.token) {
-        setToken(tokenData.token);
-      }
-
-      // Load provider accounts
-      const accountsResponse = await fetch(`/api/banking/accounts?connectionId=${connectionId}&tenantId=${currentTenant.id}`);
-      const accountsData = await accountsResponse.json();
-      if (accountsData.success) {
-        setAccounts(accountsData.accounts || []);
-      }
-
-      // Load ingestion jobs
-      const jobsResponse = await fetch(`/api/connections/jobs?connectionId=${connectionId}&tenantId=${currentTenant.id}`);
-      const jobsData = await jobsResponse.json();
-      if (jobsData.success) {
-        setJobs(jobsData.jobs || []);
-      }
-    } catch (error) {
-      console.error('Error loading connection details:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleSync() {
     if (!currentTenant || !connection || !connection.provider) return;
 
-    try {
-      setSyncing(true);
-      const response = await fetch(`/api/banking/${connection.provider}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          connectionId: connection.id,
-          tenantId: currentTenant.id,
-          syncAccounts: true,
-          syncTransactions: true,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert(`Sync complete!\nAccounts: ${data.summary?.accountsSynced || 0}\nTransactions: ${data.summary?.transactionsSynced || 0}`);
-        await loadConnectionDetails();
-      } else {
-        alert(`Sync failed: ${data.error}`);
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-      alert('Sync failed');
-    } finally {
-      setSyncing(false);
-    }
+    syncMutation.mutate({
+      provider: connection.provider,
+      connectionId: connection.id,
+      tenantId: currentTenant.id,
+      forceSync: true,
+    });
   }
 
   async function handleDelete() {
     if (!currentTenant || !connection) return;
     if (!confirm('Are you sure you want to delete this connection?')) return;
 
-    try {
-      setDeleting(true);
-      const response = await fetch(
-        `/api/connections?id=${connection.id}&tenantId=${currentTenant.id}`,
-        { method: 'DELETE' }
-      );
-
-      if (response.ok) {
+    deleteMutation.mutate({
+      connectionId: connection.id,
+      tenantId: currentTenant.id,
+    }, {
+      onSuccess: () => {
         router.push('/connections');
-      } else {
-        alert('Failed to delete connection');
-      }
-    } catch (error) {
-      console.error('Delete error:', error);
-      alert('Failed to delete connection');
-    } finally {
-      setDeleting(false);
-    }
+      },
+    });
   }
 
   function getStatusColor(status: string) {
@@ -302,7 +262,7 @@ export default function ConnectionDetailPage() {
       <Navigation />
 
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="max-w-[1400px] mx-auto px-6 py-6">
+        <div className="p-8">
           {/* Header */}
           <div className="mb-6">
             <Button
@@ -323,14 +283,14 @@ export default function ConnectionDetailPage() {
               </div>
               <div className="flex gap-2">
                 {connection.provider && (
-                  <Button onClick={handleSync} disabled={syncing}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  <Button onClick={handleSync} disabled={syncMutation.isPending}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
                     Sync Now
                   </Button>
                 )}
-                <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
                 </Button>
               </div>
             </div>
@@ -462,7 +422,7 @@ export default function ConnectionDetailPage() {
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm font-semibold text-red-800 mb-2">Errors:</p>
                   <ul className="text-sm text-red-700 space-y-1">
-                    {connection.sync_summary.errors.map((error, i) => (
+                    {connection.sync_summary.errors.map((error: string, i: number) => (
                       <li key={i} className="flex items-start gap-2">
                         <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                         <span>{error}</span>
@@ -475,7 +435,7 @@ export default function ConnectionDetailPage() {
                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm font-semibold text-yellow-800 mb-2">Warnings:</p>
                   <ul className="text-sm text-yellow-700 space-y-1">
-                    {connection.sync_summary.warnings.map((warning, i) => (
+                    {connection.sync_summary.warnings.map((warning: string, i: number) => (
                       <li key={i} className="flex items-start gap-2">
                         <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
                         <span>{warning}</span>

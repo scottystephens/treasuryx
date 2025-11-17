@@ -1,111 +1,174 @@
 # Stratifi Documentation
 
-Comprehensive documentation for the Stratifi treasury management platform.
+Welcome to the Stratifi documentation. This README provides an overview of available documentation and where to find what you need.
 
-## Directory Structure
+## 📚 Table of Contents
+
+- [Getting Started](#getting-started)
+- [Architecture](#architecture)
+- [Integrations](#integrations)
+- [Guides](#guides)
+- [Migrations](#migrations)
+- [Archive](#archive)
+
+## Getting Started
+
+**New to Stratifi?** Start here:
+
+1. [Main README](../README.md) - Project overview and quick start
+2. [Database Setup](guides/DATABASE_SETUP.md) - Initial database configuration
+3. [Deployment](guides/deployment.md) - Deploy to production
+
+## Architecture
+
+High-level system design and principles:
+
+- [Multi-Tenant System](architecture/MULTI_TENANT_SYSTEM.md) - Tenant isolation and RLS
+- [Data Ingestion Architecture](architecture/DATA_INGESTION_ARCHITECTURE.md) - How data flows
+- [Bank Data Standards](architecture/BANK_DATA_STANDARDS.md) - Industry-standard field mappings
+- [Database Design Principles](architecture/DATABASE_DESIGN_PRINCIPLES.md) - TEXT fields, no length restrictions
+
+## Integrations
+
+### Banking Providers
+
+- **[Tink](integrations/tink/README.md)** - Open Banking platform (3,400+ European banks)
+  - Status: ✅ Production Ready
+  - API: v2 with intelligent sync
+  - Coverage: Europe-wide
+
+- **[Bunq](integrations/bunq/README.md)** - Direct Bunq integration
+  - Status: ✅ Production Ready
+  - API: OAuth 2.0
+  - Coverage: Netherlands, EU
+
+### Adding More Providers
+
+- [Adding New Banking Providers](guides/ADDING_NEW_BANKING_PROVIDERS.md) - Step-by-step guide
+- [Banking Aggregation Providers](guides/BANKING_AGGREGATION_PROVIDERS.md) - Provider comparison
+
+## Guides
+
+### Core Features
+
+- **[Account Management](guides/account-management.md)** - Create, sync, deduplicate accounts
+- **[Transaction Sync](guides/transaction-sync.md)** - Intelligent sync strategy (80-90% API reduction)
+- **[CSV Ingestion](guides/CSV_INGESTION_COMPLETE.md)** - Import bank statements via CSV
+- **[Data Types](guides/DATA_TYPE_UI_GUIDE.md)** - transactions vs statements
+- **[Transactions vs Statements](guides/TRANSACTIONS_VS_STATEMENTS.md)** - Understanding the difference
+
+### Infrastructure
+
+- **[Deployment](guides/deployment.md)** - Production deployment guide
+- **[Production Deployment](guides/PRODUCTION_DEPLOYMENT.md)** - Detailed production checklist
+- **[Supabase CLI Setup](guides/SUPABASE_CLI_SETUP.md)** - CLI configuration
+- **[Database Setup](guides/DATABASE_SETUP.md)** - Initial database configuration
+
+### Banking
+
+- **[Multi-Bank Standardization](guides/MULTI_BANK_STANDARDIZATION.md)** - Standard field mappings
+- **[Exchange Rates](guides/EXCHANGE_RATES.md)** - Multi-currency support
+
+## Migrations
+
+Database schema changes over time:
+
+- [Migrations 13-14 Summary](migrations/MIGRATIONS-13-14-SUMMARY.md) - Field length fixes
+- Individual migrations: `../scripts/migrations/`
+
+### Running Migrations
+
+**Always use Supabase SQL Editor** for schema changes:
+
+1. Go to https://supabase.com/dashboard/project/YOUR_PROJECT/sql/new
+2. Copy migration SQL from `../scripts/migrations/`
+3. Paste and execute
+4. Verify success
+
+## Archive
+
+Historical documentation and old implementation summaries:
+
+- `archive/old-implementations/` - Previous implementation docs
+- `archive/` - Deprecated guides and references
+
+## Quick Links
+
+### For Developers
+
+- [.cursorrules](../.cursorrules) - Project coding standards
+- [scripts/README.md](../scripts/README.md) - Utility scripts
+- [data/backups/](../data/backups/) - Sample data and backups
+
+### For Users
+
+- **Production App**: https://stratifi-pi.vercel.app
+- **Supabase Dashboard**: https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik
+
+### For Administrators
+
+- [GitHub Repository](https://github.com/scottystephens/stratifi)
+- [Vercel Dashboard](https://vercel.com/scottystephens-projects/stratifi)
+- [STRATIFI_BRAND.md](STRATIFI_BRAND.md) - Brand guidelines
+
+## Documentation Standards
+
+### File Organization
 
 ```
 docs/
-├── architecture/        # System architecture and design docs
-├── guides/             # How-to guides and feature documentation
-├── archive/            # Historical/obsolete documentation
-├── README.md           # This file
-└── REORGANIZATION.md   # Repository reorganization guide
+├── README.md (this file)
+├── architecture/         # System design
+├── integrations/         # Provider-specific docs
+│   ├── bunq/
+│   └── tink/
+├── guides/               # How-to guides
+├── migrations/           # Database change summaries
+└── archive/              # Deprecated docs
 ```
 
----
+### Naming Conventions
 
-## 🏗️ Architecture (`architecture/`)
+- Use `kebab-case` for multi-word filenames
+- Use `UPPERCASE` for major architecture docs
+- Use `README.md` for integration/module overviews
 
-System design and architectural decisions:
+### Writing Guidelines
 
-- **DATA_INGESTION_ARCHITECTURE.md** - Multi-source data ingestion system design
-  - Database architecture (single schema vs separate)
-  - Connection types (BAI2, CSV, Plaid, SFTP)
-  - Data flow and transformation
-  - Security and compliance considerations
+- Start with "Overview" section
+- Include "Status" (✅ Production Ready, 🚧 In Progress, etc.)
+- Add "Last Updated" date
+- Use code examples
+- Link to related docs
 
-- **MULTI_TENANT_SYSTEM.md** - Multi-tenant architecture
-  - Tenant isolation via RLS
-  - User-tenant relationships
-  - Role-based access control
+## Contributing
 
----
+When adding documentation:
 
-## 📚 Guides (`guides/`)
+1. Place in appropriate directory
+2. Follow naming conventions
+3. Update this README if adding new section
+4. Link from related docs
+5. Include examples and code snippets
 
-Feature documentation and how-to guides:
+## Getting Help
 
-- **CSV_INGESTION_COMPLETE.md** - CSV import system documentation
-- **DEPLOYMENT_SUMMARY.md** - Production deployment guide
-- **DATABASE_SETUP.md** - Database setup instructions
-- **EXCHANGE_RATES.md** - Exchange rates feature
-- **PRODUCTION_DEPLOYMENT.md** - Production deployment checklist
-- **DEPLOYMENT.md** - General deployment guide
+- Check relevant guide in `guides/`
+- Review integration docs in `integrations/`
+- Check archive for historical context
+- Review `.cursorrules` for coding standards
 
----
+## Updates
 
-## 📦 Archive (`archive/`)
+This documentation is actively maintained. Last reorganization: **November 16, 2025**
 
-Historical documentation (for reference):
-
-- **COMPARISON.md** - Early platform comparisons
-- **OVERVIEW.md** - Original project overview
-- **PROJECT_SUMMARY.md** - Early project summary
-- **QUICKSTART.md** - Original quick start (see main README instead)
-- **RATES_PAGE_FIX.md** - Historical bug fix documentation
-
----
-
-## 🚀 Quick Links
-
-### Getting Started
-1. [Architecture Overview](./architecture/DATA_INGESTION_ARCHITECTURE.md)
-2. [CSV Import Guide](./guides/CSV_INGESTION_COMPLETE.md)
-3. [Deployment Summary](./guides/DEPLOYMENT_SUMMARY.md)
-
-### External Resources
-- [Supabase Dashboard](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik)
-- [Production App](https://stratifi.vercel.app)
-- [GitHub Repository](https://github.com/scottystephens/stratifi)
+Major changes:
+- Consolidated provider docs into `integrations/`
+- Moved implementation summaries to `archive/`
+- Created consolidated guides
+- Simplified file structure
 
 ---
 
-## 📝 Documentation Standards
-
-When adding new documentation:
-
-1. **Architecture docs** → `architecture/`
-   - System design decisions
-   - Database schemas
-   - Integration patterns
-   - Technical architecture
-
-2. **Feature guides** → `guides/`
-   - How-to guides
-   - Feature documentation
-   - User guides
-   - Troubleshooting
-
-3. **File naming**
-   - Use UPPERCASE for major docs (e.g., `DATA_INGESTION_ARCHITECTURE.md`)
-   - Use kebab-case for specific guides (e.g., `csv-import-guide.md`)
-   - Include dates for time-sensitive docs (e.g., `deployment-2025-01.md`)
-
----
-
-## 🔄 Keeping Docs Updated
-
-- Update docs when making significant architectural changes
-- Keep deployment summaries current
-- Add troubleshooting entries when solving issues
-- Link related docs together
-
----
-
-## 📞 Need Help?
-
-- Check the relevant guide in `guides/`
-- Review architecture docs for design decisions
-- See `../scripts/README.md` for script documentation
-
+**Stratifi** - Strategic Financial Intelligence Platform  
+Production: https://stratifi-pi.vercel.app

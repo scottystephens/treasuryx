@@ -1,519 +1,305 @@
-# Stratifi Deployment Guide
+# Deployment Guide
 
-## 🚀 Quick Start (Local Development)
+## Production Deployment
 
-The application is already running! Open your browser to:
+### Prerequisites
 
-**http://localhost:3000**
+- Vercel account
+- Supabase project
+- Banking provider credentials (Tink, Bunq)
+- GitHub repository
 
-If it's not running, start it with:
-```bash
-cd /Users/scottstephens/stratifi
-npm run dev
-```
+### Environment Variables
 
-## 📋 Available Pages
-
-1. **Dashboard**: http://localhost:3000/dashboard
-2. **Cash Management**: http://localhost:3000/cash
-3. **Entity Management**: http://localhost:3000/entities
-4. **Payment Management**: http://localhost:3000/payments
-5. **Analytics**: http://localhost:3000/analytics
-
-## 🛠️ Development Commands
+Set in Vercel dashboard:
 
 ```bash
-# Install dependencies
-npm install
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+DATABASE_URL=postgresql://postgres:[PASSWORD]@db.your-project.supabase.co:5432/postgres
 
-# Run development server (with hot reload)
-npm run dev
+# Tink
+TINK_CLIENT_ID=your_tink_client_id
+TINK_CLIENT_SECRET=your_tink_client_secret
+TINK_REDIRECT_URI=https://your-domain.vercel.app/api/banking/tink/callback
 
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Run linter
-npm run lint
+# Bunq
+BUNQ_CLIENT_ID=your_bunq_client_id
+BUNQ_CLIENT_SECRET=your_bunq_client_secret
+BUNQ_REDIRECT_URI=https://your-domain.vercel.app/api/banking/bunq/callback
+BUNQ_ENVIRONMENT=production
 ```
 
-## 🌐 Deployment Options
+### Deployment Steps
 
-### Option 1: Vercel (Recommended - Easiest)
+#### 1. Database Setup
 
-Vercel is the creators of Next.js and offers the best Next.js hosting experience.
+Run migrations via Supabase SQL Editor:
+
+```bash
+# Navigate to: https://supabase.com/dashboard/project/YOUR_PROJECT/sql/new
+
+# Run migrations in order:
+01-create-base-tables.sql
+02-entity-relationships.sql
+03-add-tenant-user-id.sql
+04-setup-data-ingestion-safe.sql
+05-add-data-type-field.sql
+06-add-bunq-oauth-support.sql
+07-add-generic-banking-providers.sql
+08-add-provider-column-to-connections.sql
+09-fix-statements-foreign-keys.sql
+10-add-statements-connection-id-index.sql
+11-enhance-accounts-and-connections-fixed.sql
+12-make-entity-id-nullable.sql
+13-fix-account-id-length.sql
+14-remove-all-length-restrictions.sql
+```
+
+#### 2. Vercel Deployment
 
 ```bash
 # Install Vercel CLI
 npm install -g vercel
 
-# Deploy (from project directory)
-cd /Users/scottstephens/stratifi
-vercel
+# Login
+vercel login
 
-# Follow the prompts:
-# - Set up and deploy? Yes
-# - Which scope? Your account
-# - Link to existing project? No
-# - What's your project's name? stratifi
-# - In which directory is your code located? ./
-# - Override settings? No
+# Link project
+vercel link
+
+# Deploy to production
+vercel --prod
 ```
 
-Your app will be live at: `https://stratifi.vercel.app` (or similar)
+#### 3. Verify Deployment
 
-**Vercel Benefits:**
-- ✅ Zero configuration
-- ✅ Automatic HTTPS
-- ✅ Global CDN
-- ✅ Automatic deployments from Git
-- ✅ Preview deployments for branches
-- ✅ Free tier available
+- [ ] App loads: https://your-domain.vercel.app
+- [ ] No console errors
+- [ ] Can login/signup
+- [ ] Can create organization
+- [ ] Can view dashboard
 
-### Option 2: Netlify
+#### 4. Test Banking Integration
+
+- [ ] Tink connection works
+- [ ] Bunq connection works
+- [ ] Account sync works
+- [ ] Transaction sync works
+- [ ] Transactions display correctly
+
+### Post-Deployment
+
+#### Monitoring
+
+Monitor these metrics:
+- Error rate
+- API response times
+- Database query performance
+- OAuth success rate
+- Transaction sync success rate
+
+#### Logs
+
+Check logs regularly:
+```bash
+vercel logs https://your-domain.vercel.app --follow
+```
+
+### Rolling Back
+
+If issues arise:
 
 ```bash
-# Install Netlify CLI
-npm install -g netlify-cli
+# List recent deployments
+vercel ls
 
-# Build the app
+# Promote previous deployment
+vercel alias <previous-deployment-url> your-domain.vercel.app
+```
+
+### Troubleshooting
+
+**Build Errors**
+```bash
+# Test locally first
 npm run build
 
-# Deploy
-netlify deploy --prod
-
-# Follow prompts to link to your account
+# Check for TypeScript errors
+npm run lint
 ```
 
-### Option 3: AWS (More Control)
-
-#### Using AWS Amplify (Easy):
-1. Push code to GitHub/GitLab
-2. Go to AWS Amplify Console
-3. Connect repository
-4. Amplify auto-detects Next.js and deploys
-
-#### Using EC2 (Advanced):
+**Environment Variables**
 ```bash
-# On your EC2 instance (Ubuntu):
-sudo apt update
-sudo apt install nodejs npm nginx
+# Verify all variables are set
+vercel env ls production
 
-# Clone/upload your code
-cd /home/ubuntu
-# ... upload stratifi folder ...
+# Pull to local for testing
+vercel env pull .env.local
+```
+
+**Database Connectivity**
+- Verify DATABASE_URL is correct
+- Check Supabase project is active
+- Test connection via psql or SQL Editor
+
+**OAuth Issues**
+- Verify redirect URIs match exactly
+- Check client IDs and secrets
+- Ensure HTTPS is used (required for OAuth)
+
+## Development Setup
+
+### Local Development
+
+```bash
+# Clone repository
+git clone https://github.com/your-org/stratifi.git
+cd stratifi
 
 # Install dependencies
-cd stratifi
 npm install
 
-# Build
+# Setup environment
+cp .env.example .env.local
+# Edit .env.local with your credentials
+
+# Run development server
+npm run dev
+
+# Open http://localhost:3000
+```
+
+### Testing
+
+```bash
+# Build production bundle
 npm run build
 
-# Run with PM2 (process manager)
-npm install -g pm2
-pm2 start npm --name "stratifi" -- start
-pm2 save
-pm2 startup
+# Test production build locally
+npm run start
 
-# Configure Nginx as reverse proxy
-sudo nano /etc/nginx/sites-available/stratifi
+# Run linter
+npm run lint
 ```
 
-Nginx config:
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
+## CI/CD
 
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
+### Automatic Deployment
 
-### Option 4: Docker
+Vercel automatically deploys:
+- **Main branch** → Production
+- **Feature branches** → Preview deployments
+
+### Manual Deployment
 
 ```bash
-# Create Dockerfile
-cat > Dockerfile << 'EOF'
-FROM node:20-alpine
+# Deploy current branch to preview
+vercel
 
-WORKDIR /app
+# Deploy to production
+vercel --prod
 
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-RUN npm run build
-
-EXPOSE 3000
-
-CMD ["npm", "start"]
-EOF
-
-# Build image
-docker build -t stratifi .
-
-# Run container
-docker run -p 3000:3000 stratifi
+# Deploy with specific name
+vercel --name stratifi-test
 ```
 
-Deploy to any cloud:
-- **AWS ECS/EKS**
-- **Google Cloud Run**
-- **Azure Container Instances**
-- **DigitalOcean App Platform**
+## Database Migrations
 
-### Option 5: Railway
+### Running Migrations
 
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
+**Always use Supabase SQL Editor for schema changes:**
 
-# Login
-railway login
+1. Go to: https://supabase.com/dashboard/project/YOUR_PROJECT/sql/new
+2. Copy migration SQL from `scripts/migrations/`
+3. Paste and execute
+4. Verify success
 
-# Initialize
-railway init
+**Never use:**
+- psql directly (connection issues)
+- Supabase CLI push (unreliable for remote)
+- Custom RPC functions (don't exist by default)
 
-# Deploy
-railway up
-```
-
-## 🔧 Production Configuration
-
-### Environment Variables
-
-Create `.env.local` for local development or add to your hosting platform:
-
-```bash
-# Database (when you migrate from CSV)
-DATABASE_URL="postgresql://user:password@host:5432/stratifi"
-
-# Authentication (NextAuth.js)
-NEXTAUTH_URL="https://your-domain.com"
-NEXTAUTH_SECRET="your-secret-key-here"
-
-# External APIs
-PLAID_CLIENT_ID="your-plaid-client-id"
-PLAID_SECRET="your-plaid-secret"
-
-# Bank APIs
-JPMORGAN_API_KEY="your-api-key"
-CHASE_API_SECRET="your-secret"
-
-# Email notifications
-SENDGRID_API_KEY="your-sendgrid-key"
-
-# Monitoring
-SENTRY_DSN="your-sentry-dsn"
-```
-
-### Performance Optimizations
-
-1. **Enable Caching**:
-```typescript
-// app/api/accounts/route.ts
-export const revalidate = 60 // Cache for 60 seconds
-```
-
-2. **Add Redis**:
-```bash
-npm install redis
-```
-
-```typescript
-import { createClient } from 'redis'
-
-const redis = createClient({ url: process.env.REDIS_URL })
-await redis.connect()
-
-// Cache expensive queries
-const cachedData = await redis.get('accounts')
-if (cachedData) return JSON.parse(cachedData)
-```
-
-3. **Optimize Images**:
-```bash
-# Next.js automatically optimizes images
-# Use the Image component:
-import Image from 'next/image'
-```
-
-4. **Add Monitoring**:
-```bash
-npm install @sentry/nextjs
-```
-
-## 🗄️ Database Migration (CSV → PostgreSQL)
-
-### 1. Set up PostgreSQL
-
-```bash
-# Install PostgreSQL
-# macOS:
-brew install postgresql
-brew services start postgresql
-
-# Ubuntu:
-sudo apt install postgresql
-sudo systemctl start postgresql
-```
-
-### 2. Create Database
+### Migration Best Practices
 
 ```sql
-CREATE DATABASE stratifi;
+-- ✅ Good: Idempotent, safe
+CREATE TABLE IF NOT EXISTS new_table (...);
+ALTER TABLE table ADD COLUMN IF NOT EXISTS new_col TEXT;
 
-CREATE TABLE entities (
-    entity_id VARCHAR(20) PRIMARY KEY,
-    entity_name VARCHAR(255),
-    legal_name VARCHAR(255),
-    country VARCHAR(100),
-    tax_id VARCHAR(50),
-    entity_type VARCHAR(100),
-    parent_entity VARCHAR(20),
-    status VARCHAR(50),
-    incorporation_date DATE
-);
-
-CREATE TABLE accounts (
-    account_id VARCHAR(20) PRIMARY KEY,
-    account_name VARCHAR(255),
-    account_number VARCHAR(50),
-    currency VARCHAR(3),
-    balance DECIMAL(15,2),
-    entity_id VARCHAR(20) REFERENCES entities(entity_id),
-    bank_name VARCHAR(255),
-    account_type VARCHAR(50),
-    status VARCHAR(50)
-);
-
-CREATE TABLE transactions (
-    transaction_id VARCHAR(20) PRIMARY KEY,
-    account_id VARCHAR(20) REFERENCES accounts(account_id),
-    date DATE,
-    description TEXT,
-    amount DECIMAL(15,2),
-    currency VARCHAR(3),
-    type VARCHAR(20),
-    category VARCHAR(50),
-    status VARCHAR(50),
-    reference VARCHAR(100)
-);
-
-CREATE TABLE payments (
-    payment_id VARCHAR(20) PRIMARY KEY,
-    from_account VARCHAR(20) REFERENCES accounts(account_id),
-    to_entity VARCHAR(255),
-    amount DECIMAL(15,2),
-    currency VARCHAR(3),
-    scheduled_date DATE,
-    status VARCHAR(50),
-    approver VARCHAR(100),
-    description TEXT,
-    payment_type VARCHAR(50),
-    priority VARCHAR(20)
-);
-
-CREATE TABLE forecasts (
-    forecast_id VARCHAR(20) PRIMARY KEY,
-    date DATE,
-    predicted_balance DECIMAL(15,2),
-    actual_balance DECIMAL(15,2),
-    variance DECIMAL(15,2),
-    confidence DECIMAL(3,2),
-    entity_id VARCHAR(20) REFERENCES entities(entity_id),
-    currency VARCHAR(3),
-    category VARCHAR(50)
-);
+-- ❌ Bad: Will fail if exists
+CREATE TABLE new_table (...);
+ALTER TABLE table ADD COLUMN new_col TEXT;
 ```
 
-### 3. Import CSV Data
+## Security
+
+### Checklist
+
+- [ ] All environment variables secured
+- [ ] Service role key never exposed to frontend
+- [ ] HTTPS enforced
+- [ ] RLS policies enabled on all tables
+- [ ] OAuth redirect URIs whitelisted
+- [ ] Rate limiting configured
+- [ ] Error messages don't expose sensitive data
+
+### Regular Security Tasks
+
+**Weekly:**
+- Review error logs for security issues
+- Check for failed auth attempts
+- Monitor API usage for anomalies
+
+**Monthly:**
+- Review RLS policies
+- Update dependencies (`npm audit`)
+- Rotate API keys if compromised
+
+**Quarterly:**
+- Full security audit
+- Review user permissions
+- Update OAuth credentials
+
+## Performance
+
+### Optimization Tips
+
+- Use Next.js Server Components
+- Implement caching where appropriate
+- Optimize database queries (indexes)
+- Use batch operations for bulk data
+- Minimize API calls (intelligent sync)
+
+### Monitoring Performance
 
 ```bash
-# Using psql
-psql -U postgres -d stratifi
+# View deployment performance
+vercel inspect <deployment-url>
 
-\copy entities FROM '/Users/scottstephens/stratifi/data/entities.csv' CSV HEADER
-\copy accounts FROM '/Users/scottstephens/stratifi/data/accounts.csv' CSV HEADER
-\copy transactions FROM '/Users/scottstephens/stratifi/data/transactions.csv' CSV HEADER
-\copy payments FROM '/Users/scottstephens/stratifi/data/payments.csv' CSV HEADER
-\copy forecasts FROM '/Users/scottstephens/stratifi/data/forecast.csv' CSV HEADER
+# Check build times
+vercel ls --debug
 ```
 
-### 4. Update Code to Use Database
+## Backup and Recovery
 
-```bash
-# Install database client
-npm install pg
-npm install @types/pg --save-dev
-```
+### Database Backups
 
-```typescript
-// lib/db.ts
-import { Pool } from 'pg'
+Supabase provides:
+- Automatic daily backups
+- Point-in-time recovery
+- Manual backup via SQL dump
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-})
+### Application State
 
-export async function query(text: string, params?: any[]) {
-  const result = await pool.query(text, params)
-  return result.rows
-}
-
-// lib/db-parser.ts (replaces csv-parser.ts)
-import { query } from './db'
-
-export async function getAccounts() {
-  return await query('SELECT * FROM accounts')
-}
-
-export async function getEntities() {
-  return await query('SELECT * FROM entities')
-}
-
-// ... etc
-```
-
-## 🔐 Adding Authentication
-
-```bash
-npm install next-auth
-npm install @next-auth/prisma-adapter @prisma/client
-```
-
-Create `app/api/auth/[...nextauth]/route.ts`:
-
-```typescript
-import NextAuth from 'next-auth'
-import GoogleProvider from 'next-auth/providers/google'
-
-const handler = NextAuth({
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  // Add more configuration
-})
-
-export { handler as GET, handler as POST }
-```
-
-Protect pages:
-
-```typescript
-import { getServerSession } from 'next-auth'
-import { redirect } from 'next/navigation'
-
-export default async function DashboardPage() {
-  const session = await getServerSession()
-  
-  if (!session) {
-    redirect('/api/auth/signin')
-  }
-  
-  // ... rest of page
-}
-```
-
-## 📊 Monitoring & Analytics
-
-### Add Error Tracking (Sentry)
-
-```bash
-npm install @sentry/nextjs
-npx @sentry/wizard@latest -i nextjs
-```
-
-### Add Analytics (Google Analytics)
-
-```typescript
-// app/layout.tsx
-import Script from 'next/script'
-
-export default function RootLayout() {
-  return (
-    <html>
-      <head>
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
-          `}
-        </Script>
-      </head>
-      <body>{children}</body>
-    </html>
-  )
-}
-```
-
-## 🔒 Security Checklist
-
-- [ ] Add authentication (NextAuth.js)
-- [ ] Add authorization (role-based access)
-- [ ] Set up HTTPS (automatic with Vercel)
-- [ ] Add rate limiting
-- [ ] Sanitize user inputs
-- [ ] Add CSRF protection
-- [ ] Set security headers
-- [ ] Add SQL injection protection (use parameterized queries)
-- [ ] Implement audit logging
-- [ ] Add data encryption at rest
-
-## 📈 Scaling Considerations
-
-1. **Database Connection Pooling**: Use PgBouncer or similar
-2. **Caching Layer**: Redis for frequently accessed data
-3. **CDN**: CloudFront, Cloudflare for static assets
-4. **Load Balancing**: Multiple Next.js instances behind ALB
-5. **Database Replication**: Read replicas for analytics queries
-6. **Queue System**: Bull/Redis for background jobs
-7. **Microservices**: Split heavy computations (forecasting) into separate services
-
-## 🆘 Troubleshooting
-
-### Port Already in Use
-```bash
-# Kill process on port 3000
-lsof -ti:3000 | xargs kill -9
-
-# Or use different port
-npm run dev -- -p 3001
-```
-
-### Module Not Found
-```bash
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Build Errors
-```bash
-# Clear Next.js cache
-rm -rf .next
-npm run build
-```
+- Code in GitHub (version controlled)
+- Deployments in Vercel (can roll back)
+- Env vars in Vercel dashboard (document separately)
 
 ---
 
-**Need help? Check the Next.js documentation: https://nextjs.org/docs**
-
+**Last Updated**: November 16, 2025  
+**Production URL**: https://stratifi-pi.vercel.app  
+**Status**: ✅ Live

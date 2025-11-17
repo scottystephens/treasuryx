@@ -3,7 +3,7 @@
 // DELETE /api/connections?id=xxx - Delete a connection
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getConnections, deleteConnection } from '@/lib/supabase';
+import { getConnections, getConnection, deleteConnection } from '@/lib/supabase';
 import { createClient } from '@/lib/supabase-server';
 
 export async function GET(req: NextRequest) {
@@ -18,9 +18,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get tenant ID from query params
+    // Get tenant ID and connection ID from query params
     const { searchParams } = new URL(req.url);
     const tenantId = searchParams.get('tenantId');
+    const connectionId = searchParams.get('id');
 
     if (!tenantId) {
       return NextResponse.json(
@@ -29,6 +30,32 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // If connection ID is provided, fetch a single connection
+    if (connectionId) {
+      try {
+        const connection = await getConnection(tenantId, connectionId);
+        
+        if (!connection) {
+          return NextResponse.json(
+            { error: 'Connection not found' },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          connection,
+        });
+      } catch (error) {
+        console.error('Get connection error:', error);
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Failed to fetch connection' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Otherwise, fetch all connections for the tenant
     const connections = await getConnections(tenantId);
 
     return NextResponse.json({

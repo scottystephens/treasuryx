@@ -1,0 +1,6 @@
+entity_name,type,jurisdiction,status,tax_id,contact_email,phone,address,website,description
+Example Corp,Corporation,Delaware,Active,12-3456789,contact@example.com,+1 (555) 123-4567,"123 Main St, Wilmington, DE 19801",https://example.com,Example corporation for demonstration
+Subsidiary LLC,LLC,Delaware,Active,98-7654321,info@subsidiary.com,+1 (555) 987-6543,"456 Oak Ave, Wilmington, DE 19802",https://subsidiary.com,Subsidiary entity example
+European Branch,Corporation,United Kingdom,Active,GB123456789,eu@branch.com,+44 20 1234 5678,"10 Downing Street, London, UK",https://eubranch.com,European operations branch
+Investment Trust,Trust,Cayman Islands,Active,,trustee@investment.com,+1 (345) 949-8066,"PO Box 123, Grand Cayman",https://investmenttrust.com,Investment trust for asset management
+Tech Startup,LLC,California,Active,77-1234567,hello@techstartup.com,+1 (415) 555-0100,"1 Market St, San Francisco, CA 94105",https://techstartup.com,Technology startup company

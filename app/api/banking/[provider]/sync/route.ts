@@ -20,6 +20,11 @@ import {
   recordSyncFailure,
   type SyncSummary,
 } from '@/lib/services/connection-metadata-service';
+import {
+  determineSyncDateRange,
+  calculateSyncMetrics,
+  formatSyncMetrics,
+} from '@/lib/services/transaction-sync-service';
 
 export async function POST(
   req: NextRequest,
@@ -53,6 +58,7 @@ export async function POST(
       transactionDaysBack = 90, // Default to last 90 days
       transactionStartDate, // Optional: override with specific start date
       transactionEndDate, // Optional: override with specific end date
+      forceSync = false, // Force sync to bypass throttling
     } = body;
 
     if (!connectionId || !tenantId) {
@@ -213,30 +219,58 @@ export async function POST(
         }
       }
 
-      // Sync transactions
+      // Sync transactions with intelligent date range
       if (syncTransactions) {
         try {
-          // Calculate date range for transaction sync
-          const endDate = transactionEndDate 
-            ? new Date(transactionEndDate)
-            : new Date();
-          
-          const startDate = transactionStartDate
-            ? new Date(transactionStartDate)
-            : new Date(endDate.getTime() - (transactionDaysBack * 24 * 60 * 60 * 1000));
-
-          console.log(`📅 Syncing transactions from ${startDate.toISOString()} to ${endDate.toISOString()}`);
-
           const { data: providerAccounts } = await supabase
             .from('provider_accounts')
-            .select('*')
+            .select('*, accounts!inner(account_id, account_type, last_synced_at)')
             .eq('connection_id', connectionId)
             .eq('provider_id', providerId)
             .eq('sync_enabled', true);
 
           if (providerAccounts && providerAccounts.length > 0) {
+            console.log(`💳 Syncing transactions for ${providerAccounts.length} account(s)...`);
+
             for (const providerAccount of providerAccounts) {
               try {
+                // Use intelligent date range calculation (unless user provided explicit dates)
+                let startDate: Date;
+                let endDate: Date;
+                let syncReason: string;
+
+                if (transactionStartDate && transactionEndDate) {
+                  // User provided explicit date range - use it
+                  startDate = new Date(transactionStartDate);
+                  endDate = new Date(transactionEndDate);
+                  syncReason = 'manual_override';
+                  console.log(`📅 Using manual date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+                } else {
+                  // Use intelligent sync service
+                  const accountData = providerAccount.accounts as any;
+                  const dateRange = await determineSyncDateRange(
+                    accountData.account_id,
+                    connectionId,
+                    accountData.account_type || 'checking',
+                    forceSync // Use forceSync parameter
+                  );
+
+                  // Calculate and log metrics
+                  const metrics = calculateSyncMetrics(dateRange);
+                  console.log(formatSyncMetrics(metrics));
+
+                  // Skip if recommended
+                  if (dateRange.skip) {
+                    console.log(`⏭️  Skipping ${providerAccount.account_name} - synced recently`);
+                    warnings.push(`${providerAccount.account_name}: Skipped (synced ${dateRange.daysSinceLastSync?.toFixed(1)}h ago)`);
+                    continue;
+                  }
+
+                  startDate = dateRange.startDate;
+                  endDate = dateRange.endDate;
+                  syncReason = dateRange.reason;
+                }
+
                 const transactions = await provider.fetchTransactions(
                   credentials,
                   providerAccount.external_account_id,
@@ -249,65 +283,128 @@ export async function POST(
 
                 for (const transaction of transactions) {
                   try {
-                    // Store in provider_transactions table
-                    await supabase.from('provider_transactions').upsert(
-                      {
-                        tenant_id: tenantId,
-                        connection_id: connectionId,
-                        provider_id: providerId,
-                        provider_account_id: providerAccount.id,
-                        external_transaction_id: transaction.externalTransactionId,
-                        external_account_id: providerAccount.external_account_id,
-                        amount: transaction.amount,
-                        currency: transaction.currency,
-                        description: transaction.description,
-                        transaction_type: transaction.type,
-                        counterparty_name: transaction.counterpartyName,
-                        counterparty_account: transaction.counterpartyAccount,
-                        reference: transaction.reference,
-                        category: transaction.category,
-                        transaction_date: transaction.date.toISOString(),
-                        import_status: 'pending',
-                        import_job_id: ingestionJob.id,
-                        provider_metadata: transaction.metadata || {},
-                      },
-                      {
-                        onConflict: 'connection_id,provider_id,external_transaction_id',
-                      }
-                    );
-
-                    // Import to main transactions table
-                    if (providerAccount.account_id) {
-                      await supabase.from('transactions').upsert(
+                    // Generate consistent transaction_id for linking
+                    const transactionId = `${providerId}_${connectionId}_${transaction.externalTransactionId}`;
+                    
+                    // ✨ STEP 1: Store in provider_transactions table with complete metadata
+                    const { data: providerTxData, error: providerTxError } = await supabase
+                      .from('provider_transactions')
+                      .upsert(
                         {
                           tenant_id: tenantId,
-                          account_id: providerAccount.account_id,
-                          transaction_date: transaction.date.toISOString(),
-                          amount: transaction.type === 'credit' ? transaction.amount : -transaction.amount,
+                          connection_id: connectionId,
+                          provider_id: providerId,
+                          provider_account_id: providerAccount.id,
+                          external_transaction_id: transaction.externalTransactionId,
+                          external_account_id: providerAccount.external_account_id,
+                          amount: transaction.amount,
                           currency: transaction.currency,
                           description: transaction.description,
-                          transaction_type: transaction.type === 'credit' ? 'Credit' : 'Debit',
-                          connection_id: connectionId,
-                          external_transaction_id: transaction.externalTransactionId,
-                          source_type: `${providerId}_api`,
+                          transaction_type: transaction.type,
+                          counterparty_name: transaction.counterpartyName,
+                          counterparty_account: transaction.counterpartyAccount,
+                          reference: transaction.reference,
+                          category: transaction.category,
+                          transaction_date: transaction.date.toISOString(),
+                          import_status: 'pending',
                           import_job_id: ingestionJob.id,
-                          metadata: {
-                            counterparty_name: transaction.counterpartyName,
-                            counterparty_account: transaction.counterpartyAccount,
-                            reference: transaction.reference,
-                            provider_id: providerId,
-                            ...transaction.metadata,
-                          },
+                          // ✨ Store COMPLETE provider metadata (now includes raw_transaction)
+                          provider_metadata: transaction.metadata || {},
+                          // ✨ IMPORTANT: Link to main transaction (will update after creating main tx)
+                          transaction_id: transactionId,
                         },
                         {
-                          onConflict: 'tenant_id,connection_id,external_transaction_id',
+                          onConflict: 'connection_id,provider_id,external_transaction_id',
                         }
-                      );
+                      )
+                      .select()
+                      .single();
 
-                      transactionsSynced++;
+                    if (providerTxError) {
+                      console.error(`Error storing provider transaction ${transaction.externalTransactionId}:`, providerTxError);
+                      errors.push(`Failed to store transaction ${transaction.externalTransactionId}: ${providerTxError.message}`);
+                      continue;
+                    }
+
+                    // ✨ STEP 2: Import to main transactions table
+                    // Need to get the TEXT account_id (not UUID id) from the accounts table
+                    if (providerAccount.account_id) {
+                      // Fetch the account to get the TEXT account_id field
+                      const { data: account, error: accountError } = await supabase
+                        .from('accounts')
+                        .select('account_id')
+                        .eq('id', providerAccount.account_id)
+                        .single();
+
+                      if (accountError) {
+                        console.error(`Error fetching account for provider account ${providerAccount.id}:`, accountError);
+                        errors.push(`Account lookup failed for ${providerAccount.account_name}: ${accountError.message}`);
+                        continue;
+                      }
+
+                      if (account && account.account_id) {
+                        const { data: mainTxData, error: txError } = await supabase
+                          .from('transactions')
+                          .upsert(
+                            {
+                              transaction_id: transactionId, // Required primary key
+                              tenant_id: tenantId,
+                              account_id: account.account_id, // Use TEXT account_id, not UUID id
+                              date: transaction.date.toISOString().split('T')[0], // Use 'date' column, format as YYYY-MM-DD
+                              amount: transaction.type === 'credit' ? transaction.amount : -transaction.amount,
+                              currency: transaction.currency,
+                              description: transaction.description,
+                              type: transaction.type === 'credit' ? 'Credit' : 'Debit',
+                              category: transaction.category || 'Uncategorized', // Required field
+                              status: 'Completed', // Required field
+                              reference: transaction.reference,
+                              connection_id: connectionId,
+                              external_transaction_id: transaction.externalTransactionId,
+                              source_type: `${providerId}_api`,
+                              import_job_id: ingestionJob.id,
+                              metadata: {
+                                counterparty_name: transaction.counterpartyName,
+                                counterparty_account: transaction.counterpartyAccount,
+                                reference: transaction.reference,
+                                provider_id: providerId,
+                                ...transaction.metadata,
+                              },
+                            },
+                            {
+                              onConflict: 'transaction_id', // Use transaction_id as conflict key
+                            }
+                          )
+                          .select()
+                          .single();
+
+                        if (txError) {
+                          console.error(`Error storing transaction ${transaction.externalTransactionId}:`, txError);
+                          errors.push(`Failed to import transaction ${transaction.externalTransactionId}: ${txError.message}`);
+                        } else {
+                          transactionsSynced++;
+                          
+                          // ✨ STEP 3: Update provider_transactions to mark as imported
+                          if (mainTxData && providerTxData) {
+                            await supabase
+                              .from('provider_transactions')
+                              .update({
+                                import_status: 'imported',
+                                transaction_id: mainTxData.transaction_id,
+                              })
+                              .eq('id', providerTxData.id);
+                          }
+                        }
+                      } else {
+                        console.warn(`Account not found for provider account ${providerAccount.id}, skipping transaction import`);
+                        errors.push(`Account not found for ${providerAccount.account_name}, transaction ${transaction.externalTransactionId} skipped`);
+                      }
+                    } else {
+                      console.warn(`Provider account ${providerAccount.id} has no linked account_id`);
+                      errors.push(`No account_id for ${providerAccount.account_name}, transaction ${transaction.externalTransactionId} skipped`);
                     }
                   } catch (txError) {
-                    console.error(`Error importing transaction:`, txError);
+                    console.error(`Error importing transaction ${transaction.externalTransactionId}:`, txError);
+                    errors.push(`Transaction import error: ${txError instanceof Error ? txError.message : String(txError)}`);
                   }
                 }
               } catch (txFetchError) {

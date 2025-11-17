@@ -70,29 +70,50 @@ export class TinkProvider extends BankingProvider {
     const tinkAccounts = await TinkClient.getAccounts(credentials.tokens.accessToken);
 
     // Map Tink accounts to provider accounts
-    return tinkAccounts.map((account) => ({
-      externalAccountId: account.id,
-      accountName: account.name || account.accountNumber || `Account ${account.id}`,
-      accountNumber: account.accountNumber || account.identifiers?.accountNumber || account.id,
-      accountType: this.mapAccountType(account.type),
-      currency: account.balance?.currency || account.currencyDenominatedBalance?.currencyCode || 'EUR',
-      balance: account.balance 
-        ? (typeof account.balance === 'object' && 'amount' in account.balance
+    return tinkAccounts.map((account) => {
+      // Parse balance from balances.booked.amount.value structure (Tink v2 API)
+      let balance = 0;
+      let currency = 'EUR';
+      
+      if (account.balances?.booked?.amount?.value) {
+        const amountValue = account.balances.booked.amount.value;
+        balance = TinkClient.formatTinkAmount(amountValue);
+        currency = account.balances.booked.amount.currencyCode || 'EUR';
+      } else if (account.balance) {
+        // Fallback to old structure if it exists
+        balance = typeof account.balance === 'object' && 'amount' in account.balance
           ? TinkClient.formatTinkAmount(account.balance.amount as any)
-          : (account.balance as any))
-        : (account.currencyDenominatedBalance?.amount || 0),
-      iban: account.identifiers?.iban,
-      bic: account.identifiers?.bban, // Tink doesn't always provide BIC
-      status: account.closed ? 'closed' : 'active' as 'active' | 'inactive' | 'closed',
-      metadata: {
-        tink_account_type: account.type,
-        financial_institution_id: account.financialInstitutionId,
-        holder_name: account.holderName,
-        flags: account.flags,
-        refreshed: account.refreshed,
-        created: account.created,
-      },
-    }));
+          : (account.balance as any);
+        currency = account.balance?.currency || 'EUR';
+      } else if (account.currencyDenominatedBalance) {
+        balance = account.currencyDenominatedBalance.amount || 0;
+        currency = account.currencyDenominatedBalance.currencyCode || 'EUR';
+      }
+
+      return {
+        externalAccountId: account.id,
+        accountName: account.name || account.accountNumber || `Account ${account.id}`,
+        accountNumber: account.accountNumber || account.identifiers?.accountNumber || account.id,
+        accountType: this.mapAccountType(account.type),
+        currency,
+        balance,
+        iban: typeof account.identifiers?.iban === 'object' 
+          ? account.identifiers.iban.iban 
+          : account.identifiers?.iban,
+        bic: typeof account.identifiers?.iban === 'object'
+          ? account.identifiers.iban.bic
+          : account.identifiers?.bban,
+        status: account.closed ? 'closed' : 'active' as 'active' | 'inactive' | 'closed',
+        metadata: {
+          tink_account_type: account.type,
+          financial_institution_id: account.financialInstitutionId,
+          holder_name: account.holderName,
+          flags: account.flags,
+          refreshed: account.refreshed,
+          created: account.created,
+        },
+      };
+    });
   }
 
   async fetchAccount(
@@ -101,19 +122,38 @@ export class TinkProvider extends BankingProvider {
   ): Promise<ProviderAccount> {
     const account = await TinkClient.getAccount(credentials.tokens.accessToken, accountId);
 
+    // Parse balance from balances.booked.amount.value structure (Tink v2 API)
+    let balance = 0;
+    let currency = 'EUR';
+    
+    if (account.balances?.booked?.amount?.value) {
+      const amountValue = account.balances.booked.amount.value;
+      balance = TinkClient.formatTinkAmount(amountValue);
+      currency = account.balances.booked.amount.currencyCode || 'EUR';
+    } else if (account.balance) {
+      // Fallback to old structure if it exists
+      balance = typeof account.balance === 'object' && 'amount' in account.balance
+        ? TinkClient.formatTinkAmount(account.balance.amount as any)
+        : (account.balance as any);
+      currency = account.balance?.currency || 'EUR';
+    } else if (account.currencyDenominatedBalance) {
+      balance = account.currencyDenominatedBalance.amount || 0;
+      currency = account.currencyDenominatedBalance.currencyCode || 'EUR';
+    }
+
     return {
       externalAccountId: account.id,
       accountName: account.name || account.accountNumber || `Account ${account.id}`,
       accountNumber: account.accountNumber || account.identifiers?.accountNumber || account.id,
       accountType: this.mapAccountType(account.type),
-      currency: account.balance?.currency || account.currencyDenominatedBalance?.currencyCode || 'EUR',
-      balance: account.balance 
-        ? (typeof account.balance === 'object' && 'amount' in account.balance
-          ? TinkClient.formatTinkAmount(account.balance.amount as any)
-          : (account.balance as any))
-        : (account.currencyDenominatedBalance?.amount || 0),
-      iban: account.identifiers?.iban,
-      bic: account.identifiers?.bban,
+      currency,
+      balance,
+      iban: typeof account.identifiers?.iban === 'object' 
+        ? account.identifiers.iban.iban 
+        : account.identifiers?.iban,
+      bic: typeof account.identifiers?.iban === 'object'
+        ? account.identifiers.iban.bic
+        : account.identifiers?.bban,
       status: account.closed ? 'closed' : 'active' as 'active' | 'inactive' | 'closed',
       metadata: {
         tink_account_type: account.type,
@@ -164,14 +204,39 @@ export class TinkProvider extends BankingProvider {
         counterpartyAccount: undefined, // Tink doesn't always provide this
         reference: txn.reference,
         category: txn.categories?.pfm?.name,
+        
+        // ✨ ENHANCED METADATA - Store COMPLETE Tink transaction data
         metadata: {
-          tink_transaction_id: txn.id,
+          // Store complete raw transaction for full fidelity and audit trail
+          raw_transaction: txn,
+          
+          // Extracted commonly-used fields for easier querying
           booking_status: txn.bookingStatus,
-          original_date: txn.originalDate,
           value_date: txn.dates?.value,
+          original_date: txn.originalDate,
           transaction_type: txn.types?.type,
           transaction_code: txn.types?.code,
+          category_id: txn.categories?.pfm?.id,
+          category_name: txn.categories?.pfm?.name,
           notes: txn.notes,
+          status: txn.status,
+          
+          // Merchant details
+          merchant_name: txn.merchantName,
+          merchant_category_code: txn.merchantCategoryCode,
+          merchant_location: txn.location,
+          
+          // Additional identifiers
+          provider_transaction_id: txn.identifiers?.providerTransactionId,
+          identifiers: txn.identifiers,
+          
+          // Descriptions
+          description_original: txn.descriptions?.original,
+          description_display: txn.descriptions?.display,
+          
+          // Dates for easy access
+          date_booked: txn.dates?.booked,
+          date_value: txn.dates?.value,
         },
       };
     });

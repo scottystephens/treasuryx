@@ -8,11 +8,15 @@ interface User {
   id: string
   email: string
   created_at: string
+  user_metadata?: {
+    is_super_admin?: boolean
+  }
 }
 
 interface AuthContextType {
   user: User | null
   loading: boolean
+  isSuperAdmin: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -25,12 +29,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user as User | null)
+      const currentUser = session?.user as User | null
+      setUser(currentUser)
+      setIsSuperAdmin(currentUser?.user_metadata?.is_super_admin === true)
       setLoading(false)
     })
 
@@ -38,7 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user as User | null)
+      const currentUser = session?.user as User | null
+      setUser(currentUser)
+      setIsSuperAdmin(currentUser?.user_metadata?.is_super_admin === true)
       setLoading(false)
     })
 
@@ -110,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, error }}>
+    <AuthContext.Provider value={{ user, loading, isSuperAdmin, signIn, signUp, signOut, error }}>
       {children}
     </AuthContext.Provider>
   )

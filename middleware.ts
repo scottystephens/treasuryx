@@ -38,6 +38,24 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Protect /admin routes - require super admin access
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    if (!user) {
+      // Not logged in - redirect to login
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // Check if user is super admin
+    const isSuperAdmin = user.user_metadata?.is_super_admin === true
+    
+    if (!isSuperAdmin) {
+      // Not a super admin - redirect to dashboard with error
+      const redirectUrl = new URL('/dashboard', request.url)
+      redirectUrl.searchParams.set('error', 'admin_access_required')
+      return NextResponse.redirect(redirectUrl)
+    }
+  }
+
   // Optional: Log for debugging
   if (request.nextUrl.pathname.startsWith('/api/')) {
     console.log('API Request:', {

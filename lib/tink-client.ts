@@ -22,8 +22,31 @@ export interface TinkAccount {
     amount: number;
     currency: string;
   };
+  balances?: {
+    booked?: {
+      amount: {
+        value: {
+          unscaledValue: string;
+          scale: string;
+        };
+        currencyCode: string;
+      };
+    };
+    available?: {
+      amount: {
+        value: {
+          unscaledValue: string;
+          scale: string;
+        };
+        currencyCode: string;
+      };
+    };
+  };
   identifiers?: {
-    iban?: string;
+    iban?: string | {
+      iban: string;
+      bic?: string;
+    };
     bban?: string;
     accountNumber?: string;
   };
@@ -69,10 +92,19 @@ export interface TinkTransaction {
     code?: string;
   };
   merchantName?: string;
+  merchantCategoryCode?: string;
+  location?: string;
   notes?: string;
   reference?: string;
   bookingStatus?: string;
   originalDate?: string;
+  status?: string;
+  identifiers?: {
+    providerTransactionId?: string;
+    [key: string]: any;
+  };
+  // Allow any additional fields from Tink
+  [key: string]: any;
 }
 
 export interface TinkUser {
@@ -299,15 +331,16 @@ async function tinkApiRequest<T>(
 }
 
 // =====================================================
-// Account Functions
+// Account Functions (Tink API v2)
+// Documentation: https://docs.tink.com/resources/accounts/list-accounts
 // =====================================================
 
 /**
- * Get all accounts for a user
+ * Get all accounts for a user using Tink API v2
  */
 export async function getAccounts(accessToken: string): Promise<TinkAccount[]> {
   const response = await tinkApiRequest<{ accounts: TinkAccount[] }>(
-    '/api/v1/accounts/list',
+    '/data/v2/accounts',
     accessToken,
     { method: 'GET' }
   );
@@ -320,14 +353,14 @@ export async function getAccounts(accessToken: string): Promise<TinkAccount[]> {
 }
 
 /**
- * Get a specific account
+ * Get a specific account using Tink API v2
  */
 export async function getAccount(
   accessToken: string,
   accountId: string
 ): Promise<TinkAccount> {
   const response = await tinkApiRequest<{ account: TinkAccount }>(
-    `/api/v1/accounts/${accountId}`,
+    `/data/v2/accounts/${accountId}`,
     accessToken,
     { method: 'GET' }
   );
@@ -339,19 +372,58 @@ export async function getAccount(
  * Format Tink amount to number
  * Handles both unscaledValue/scale format and direct number
  */
-export function formatTinkAmount(amount: { unscaledValue: number; scale: number } | number): number {
+export function formatTinkAmount(
+  amount: 
+    | { unscaledValue: number | string; scale: number | string } 
+    | { value: { unscaledValue: number | string; scale: number | string } }
+    | number
+): number {
   if (typeof amount === 'number') {
     return amount;
   }
-  return amount.unscaledValue / Math.pow(10, amount.scale);
+  
+  // Handle nested structure: { value: { unscaledValue, scale } }
+  if ('value' in amount) {
+    const value = amount.value;
+    const unscaledValue = typeof value.unscaledValue === 'string' 
+      ? parseFloat(value.unscaledValue) 
+      : value.unscaledValue;
+    const scale = typeof value.scale === 'string'
+      ? parseFloat(value.scale)
+      : value.scale;
+    return unscaledValue / Math.pow(10, scale);
+  }
+  
+  // Handle flat structure: { unscaledValue, scale }
+  if ('unscaledValue' in amount) {
+    const unscaledValue = typeof amount.unscaledValue === 'string'
+      ? parseFloat(amount.unscaledValue)
+      : amount.unscaledValue;
+    const scale = typeof amount.scale === 'string'
+      ? parseFloat(amount.scale)
+      : amount.scale;
+    return unscaledValue / Math.pow(10, scale);
+  }
+  
+  return 0;
 }
 
 // =====================================================
-// Transaction Functions
+// Transaction Functions (Tink API v2)
+// Documentation: https://docs.tink.com/resources/transactions/list-transactions
 // =====================================================
 
 /**
- * Get transactions for an account
+ * Tink API v2 Transaction Response
+ */
+export interface TinkV2TransactionResponse {
+  transactions: TinkTransaction[];
+  nextPageToken?: string;
+}
+
+/**
+ * Get transactions for an account using Tink API v2
+ * Uses cursor-based pagination for better performance
  */
 export async function getTransactions(
   accessToken: string,
@@ -364,33 +436,130 @@ export async function getTransactions(
 ): Promise<TinkTransaction[]> {
   const params = new URLSearchParams();
   
+  // Filter by account ID
+  params.append('accountIdIn', accountId);
+  
+  // Date filtering - v2 uses bookedDateGte and bookedDateLte
   if (options?.startDate) {
-    params.append('startDate', options.startDate.toISOString());
+    // Format: YYYY-MM-DD
+    params.append('bookedDateGte', options.startDate.toISOString().split('T')[0]);
   }
   if (options?.endDate) {
-    params.append('endDate', options.endDate.toISOString());
-  }
-  if (options?.limit) {
-    params.append('max', options.limit.toString());
+    // Format: YYYY-MM-DD
+    params.append('bookedDateLte', options.endDate.toISOString().split('T')[0]);
   }
   
-  const queryString = params.toString();
-  const endpoint = `/api/v1/transactions/${accountId}${queryString ? `?${queryString}` : ''}`;
+  // Page size (max 500 per page in v2)
+  const pageSize = Math.min(options?.limit || 500, 500);
+  params.append('pageSize', pageSize.toString());
   
-  const response = await tinkApiRequest<{ transactions: TinkTransaction[] }>(
-    endpoint,
-    accessToken,
-    { method: 'GET' }
-  );
+  // v2 endpoint
+  const endpoint = `/data/v2/transactions?${params.toString()}`;
   
-  return response.transactions || [];
+  try {
+    const response = await tinkApiRequest<TinkV2TransactionResponse>(
+      endpoint,
+      accessToken,
+      { method: 'GET' }
+    );
+    
+    return response.transactions || [];
+  } catch (error) {
+    console.error('Error fetching transactions from Tink v2 API:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get transactions with automatic pagination support
+ * Fetches all transactions across multiple pages if needed
+ */
+export async function getTransactionsPaginated(
+  accessToken: string,
+  accountId: string,
+  options?: {
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    maxPages?: number; // Safety limit
+  }
+): Promise<TinkTransaction[]> {
+  const allTransactions: TinkTransaction[] = [];
+  const pageSize = 500; // Max page size
+  const maxPages = options?.maxPages || 10; // Safety limit: max 10 pages = 5000 transactions
+  const maxTransactions = options?.limit || Number.MAX_SAFE_INTEGER;
+  
+  let pageToken: string | undefined = undefined;
+  let pageCount = 0;
+  
+  while (pageCount < maxPages && allTransactions.length < maxTransactions) {
+    const params = new URLSearchParams();
+    
+    // Filter by account ID
+    params.append('accountIdIn', accountId);
+    
+    // Date filtering
+    if (options?.startDate) {
+      params.append('bookedDateGte', options.startDate.toISOString().split('T')[0]);
+    }
+    if (options?.endDate) {
+      params.append('bookedDateLte', options.endDate.toISOString().split('T')[0]);
+    }
+    
+    // Pagination
+    params.append('pageSize', pageSize.toString());
+    if (pageToken) {
+      params.append('pageToken', pageToken);
+    }
+    
+    const endpoint = `/data/v2/transactions?${params.toString()}`;
+    
+    try {
+      const response = await tinkApiRequest<TinkV2TransactionResponse>(
+        endpoint,
+        accessToken,
+        { method: 'GET' }
+      );
+      
+      const transactions = response.transactions || [];
+      allTransactions.push(...transactions);
+      
+      console.log(`📄 Fetched page ${pageCount + 1}: ${transactions.length} transactions (total: ${allTransactions.length})`);
+      
+      // Check if there are more pages
+      pageToken = response.nextPageToken;
+      if (!pageToken || transactions.length === 0) {
+        break; // No more pages
+      }
+      
+      pageCount++;
+      
+      // Check if we've reached the limit
+      if (allTransactions.length >= maxTransactions) {
+        break;
+      }
+    } catch (error) {
+      console.error(`Error fetching page ${pageCount + 1}:`, error);
+      // Return what we have so far instead of failing completely
+      break;
+    }
+  }
+  
+  // Trim to exact limit if specified
+  if (options?.limit && allTransactions.length > options.limit) {
+    return allTransactions.slice(0, options.limit);
+  }
+  
+  return allTransactions;
 }
 
 /**
  * Get all transactions across all accounts
+ * v2 API allows fetching multiple accounts at once
  */
 export async function getAllTransactions(
   accessToken: string,
+  accountIds?: string[], // Optional: filter by specific accounts
   options?: {
     startDate?: Date;
     endDate?: Date;
@@ -399,26 +568,37 @@ export async function getAllTransactions(
 ): Promise<TinkTransaction[]> {
   const params = new URLSearchParams();
   
+  // Filter by account IDs (can pass multiple)
+  if (accountIds && accountIds.length > 0) {
+    accountIds.forEach(id => params.append('accountIdIn', id));
+  }
+  
+  // Date filtering
   if (options?.startDate) {
-    params.append('startDate', options.startDate.toISOString());
+    params.append('bookedDateGte', options.startDate.toISOString().split('T')[0]);
   }
   if (options?.endDate) {
-    params.append('endDate', options.endDate.toISOString());
-  }
-  if (options?.limit) {
-    params.append('max', options.limit.toString());
+    params.append('bookedDateLte', options.endDate.toISOString().split('T')[0]);
   }
   
-  const queryString = params.toString();
-  const endpoint = `/api/v1/transactions${queryString ? `?${queryString}` : ''}`;
+  // Page size
+  const pageSize = Math.min(options?.limit || 500, 500);
+  params.append('pageSize', pageSize.toString());
   
-  const response = await tinkApiRequest<{ transactions: TinkTransaction[] }>(
-    endpoint,
-    accessToken,
-    { method: 'GET' }
-  );
+  const endpoint = `/data/v2/transactions?${params.toString()}`;
   
-  return response.transactions || [];
+  try {
+    const response = await tinkApiRequest<TinkV2TransactionResponse>(
+      endpoint,
+      accessToken,
+      { method: 'GET' }
+    );
+    
+    return response.transactions || [];
+  } catch (error) {
+    console.error('Error fetching all transactions from Tink v2 API:', error);
+    throw error;
+  }
 }
 
 // =====================================================

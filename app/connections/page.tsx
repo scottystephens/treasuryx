@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, FileText, Database, Trash2, Calendar, Building2, RefreshCw } from 'lucide-react';
+import { useConnections, useDeleteConnection, useSyncConnection } from '@/lib/hooks/use-connections';
+import { toast } from 'sonner';
 
 interface Connection {
   id: string;
@@ -28,10 +30,13 @@ interface Connection {
 export default function ConnectionsPage() {
   const router = useRouter();
   const { currentTenant, userTenants } = useTenant();
-  const [connections, setConnections] = useState<Connection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
+
+  // Use React Query for connections
+  const { data: connections = [], isLoading: loading, error } = useConnections(currentTenant?.id);
+  const deleteConnectionMutation = useDeleteConnection();
+  const syncMutation = useSyncConnection();
 
   useEffect(() => {
     // If no tenant at all, redirect to onboarding
@@ -39,30 +44,16 @@ export default function ConnectionsPage() {
       router.push('/onboarding');
       return;
     }
+  }, [userTenants, loading, router]);
 
-    // If we have tenants but none is selected, wait for tenant context to load
-    if (currentTenant) {
-      loadConnections();
+  // Show error toast if query fails
+  useEffect(() => {
+    if (error) {
+      toast.error('Failed to load connections', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
-  }, [currentTenant, userTenants, router]);
-
-  async function loadConnections() {
-    if (!currentTenant) return;
-
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/connections?tenantId=${currentTenant.id}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setConnections(data.connections);
-      }
-    } catch (error) {
-      console.error('Error loading connections:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [error]);
 
   async function handleDelete(connectionId: string) {
     if (!currentTenant) return;
@@ -70,62 +61,30 @@ export default function ConnectionsPage() {
       return;
     }
 
-    try {
-      setDeleting(connectionId);
-      const response = await fetch(
-        `/api/connections?id=${connectionId}&tenantId=${currentTenant.id}`,
-        { method: 'DELETE' }
-      );
-
-      if (response.ok) {
-        setConnections(connections.filter((c) => c.id !== connectionId));
-      } else {
-        alert('Failed to delete connection');
+    setDeleting(connectionId);
+    deleteConnectionMutation.mutate(
+      { connectionId, tenantId: currentTenant.id },
+      {
+        onSettled: () => setDeleting(null),
       }
-    } catch (error) {
-      console.error('Error deleting connection:', error);
-      alert('Failed to delete connection');
-    } finally {
-      setDeleting(null);
-    }
+    );
   }
 
   async function handleSyncBankingProvider(connectionId: string, providerId: string) {
     if (!currentTenant) return;
     
-    try {
-      setSyncing(connectionId);
-      
-      // Use generic banking provider sync endpoint
-      const syncResponse = await fetch(`/api/banking/${providerId}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          connectionId,
-          tenantId: currentTenant.id,
-          syncAccounts: true,
-          syncTransactions: true,
-        }),
-      });
-      
-      const syncData = await syncResponse.json();
-      
-      if (!syncData.success) {
-        throw new Error(syncData.error || 'Failed to sync');
+    setSyncing(connectionId);
+    syncMutation.mutate(
+      {
+        provider: providerId,
+        connectionId,
+        tenantId: currentTenant.id,
+        forceSync: true,
+      },
+      {
+        onSettled: () => setSyncing(null),
       }
-      
-      // Reload connections to show updated sync time
-      await loadConnections();
-      
-      alert(
-        `Sync complete!\nAccounts: ${syncData.accountsSynced || 0}\nTransactions: ${syncData.transactionsSynced || 0} synced`
-      );
-    } catch (error) {
-      console.error('Sync error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to sync');
-    } finally {
-      setSyncing(null);
-    }
+    );
   }
 
   function getConnectionIcon(type: string) {
@@ -229,7 +188,7 @@ export default function ConnectionsPage() {
       <Navigation />
       
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="max-w-[1600px] mx-auto px-6 py-6">
+        <div className="p-8">
           {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -274,7 +233,7 @@ export default function ConnectionsPage() {
           {/* Connections Grid */}
           {!loading && connections.length > 0 && (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {connections.map((connection) => (
+              {connections.map((connection: Connection) => (
                 <Card key={connection.id} className="p-6 hover:shadow-lg transition-shadow">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">

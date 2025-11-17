@@ -1,0 +1,9 @@
+account_name,account_type,bank_name,account_number,currency,entity_name,balance,iban,bic,status,description
+Main Operating Account,checking,JPMorgan Chase Bank,1234567890,USD,Example Corp,50000,,,active,Primary operating account for daily transactions
+Euro Operations,checking,Deutsche Bank,DE89370400440532013000,EUR,European Branch,25000,DE89370400440532013000,DEUTDEFF,active,European operations checking account
+USD Savings,savings,Bank of America,9876543210,USD,Example Corp,100000,,,active,High-yield savings account
+Investment Portfolio,investment_brokerage,Charles Schwab,INV-123456,USD,Investment Trust,500000,,,active,Diversified investment portfolio
+Credit Line,line_of_credit,Wells Fargo,LOC-789012,USD,Example Corp,-50000,,,active,Business line of credit
+GBP Operating,checking,Barclays Bank,GB29NWBK60161331926819,GBP,European Branch,15000,GB29NWBK60161331926819,BARCGB22,active,UK pound sterling operating account
+Payroll Account,payroll,JPMorgan Chase Bank,PAY-456789,USD,Example Corp,75000,,,active,Dedicated payroll account
+Treasury Account,treasury,UBS AG,TRS-987654,CHF,Investment Trust,200000,,,active,Swiss franc treasury management
