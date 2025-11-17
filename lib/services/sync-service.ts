@@ -228,26 +228,30 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
             try {
               let startDate: Date;
               let endDate: Date;
+              let dateRangeInfo: Awaited<ReturnType<typeof determineSyncDateRange>> | null = null;
 
               if (transactionStartDate && transactionEndDate) {
                 startDate = new Date(transactionStartDate);
                 endDate = new Date(transactionEndDate);
               } else {
                 const accountData = providerAccount.accounts as any;
-                const dateRange = await determineSyncDateRange(
+                dateRangeInfo = await determineSyncDateRange(
                   accountData.account_id,
                   connectionId,
                   accountData.account_type || 'checking',
                   forceSync
                 );
 
-                if (dateRange.skip) {
+                if (dateRangeInfo.skip) {
                   warnings.push(`${providerAccount.account_name}: Skipped (synced recently)`);
                   continue;
                 }
 
-                startDate = dateRange.startDate;
-                endDate = dateRange.endDate;
+                startDate = dateRangeInfo.startDate;
+                endDate = dateRangeInfo.endDate;
+
+                const metrics = calculateSyncMetrics(dateRangeInfo);
+                console.log(formatSyncMetrics(metrics));
               }
 
               const transactions = await provider.fetchTransactions(
@@ -344,6 +348,20 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
                 } catch (txError) {
                   errors.push(`Transaction import error: ${txError instanceof Error ? txError.message : String(txError)}`);
                 }
+              }
+
+              // Update account metadata to inform future incremental sync windows
+              if (providerAccount.account_id) {
+                const syncTimestamp = (dateRangeInfo?.endDate || endDate || new Date()).toISOString();
+                const accountUpdates: Record<string, any> = {
+                  last_synced_at: syncTimestamp,
+                  updated_at: new Date().toISOString(),
+                };
+
+                await supabase
+                  .from('accounts')
+                  .update(accountUpdates)
+                  .eq('id', providerAccount.account_id);
               }
             } catch (txFetchError) {
               errors.push(`Account ${providerAccount.account_name}: ${provider.getErrorMessage(txFetchError)}`);

@@ -24,18 +24,21 @@ export interface BackfillConfig {
 
 // Configurable backfill periods by account type (in days)
 const BACKFILL_PERIODS: BackfillConfig = {
-  checking: 90, // 3 months for operating accounts
-  savings: 180, // 6 months for savings
-  credit_card: 365, // 1 year for credit cards (tax/expense tracking)
-  loan: 365, // 1 year for loans
-  investment: 180, // 6 months for investments
-  default: 90, // Default to 3 months
+  checking: 90,
+  savings: 180,
+  credit_card: 365,
+  loan: 365,
+  investment: 180,
+  default: 90,
 };
+
+// Initial connections should fetch the deepest range possible (2 years)
+const INITIAL_BACKFILL_DAYS = 730;
 
 // Sync throttling settings
 const MIN_SYNC_INTERVAL_HOURS = 1; // Don't sync more than once per hour (unless forced)
-const INCREMENTAL_OVERLAP_DAYS = 1; // 1-day overlap for incremental syncs
-const MODERATE_GAP_OVERLAP_DAYS = 7; // 1-week overlap for moderate gaps
+const INCREMENTAL_OVERLAP_DAYS = 3; // 3-day overlap for incremental syncs
+const MODERATE_GAP_OVERLAP_DAYS = 10; // Larger overlap for weekly/monthly syncs
 
 /**
  * Determine the optimal date range for syncing transactions
@@ -58,10 +61,12 @@ export async function determineSyncDateRange(
     .single();
 
   const lastSyncAt = account?.last_synced_at ? new Date(account.last_synced_at) : null;
+  const lastTransactionDate = await getLastTransactionDate(accountId, connectionId);
+  const mostRecentSyncPoint = getMostRecentDate(lastSyncAt, lastTransactionDate);
 
   // First-time sync - do a full backfill
-  if (!lastSyncAt) {
-    const backfillDays = getBackfillPeriod(accountType);
+  if (!mostRecentSyncPoint) {
+    const backfillDays = getInitialBackfillPeriod(accountType);
     return {
       startDate: new Date(now.getTime() - backfillDays * 24 * 60 * 60 * 1000),
       endDate: now,
@@ -70,13 +75,13 @@ export async function determineSyncDateRange(
   }
 
   // Calculate hours since last sync
-  const hoursSinceSync = (now.getTime() - lastSyncAt.getTime()) / (60 * 60 * 1000);
+  const hoursSinceSync = (now.getTime() - mostRecentSyncPoint.getTime()) / (60 * 60 * 1000);
   const daysSinceSync = hoursSinceSync / 24;
 
   // Very recent sync - skip unless forced
   if (hoursSinceSync < MIN_SYNC_INTERVAL_HOURS && !force) {
     return {
-      startDate: lastSyncAt,
+      startDate: mostRecentSyncPoint,
       endDate: now,
       reason: 'incremental',
       skip: true,
@@ -87,7 +92,7 @@ export async function determineSyncDateRange(
   // Forced sync - always sync, but use incremental window
   if (force) {
     return {
-      startDate: new Date(lastSyncAt.getTime() - INCREMENTAL_OVERLAP_DAYS * 24 * 60 * 60 * 1000),
+      startDate: new Date(mostRecentSyncPoint.getTime() - INCREMENTAL_OVERLAP_DAYS * 24 * 60 * 60 * 1000),
       endDate: now,
       reason: 'forced',
       daysSinceLastSync: daysSinceSync,
@@ -97,7 +102,7 @@ export async function determineSyncDateRange(
   // Recent sync (< 7 days) - incremental with 1-day overlap
   if (daysSinceSync <= 7) {
     return {
-      startDate: new Date(lastSyncAt.getTime() - INCREMENTAL_OVERLAP_DAYS * 24 * 60 * 60 * 1000),
+      startDate: new Date(mostRecentSyncPoint.getTime() - INCREMENTAL_OVERLAP_DAYS * 24 * 60 * 60 * 1000),
       endDate: now,
       reason: 'incremental',
       daysSinceLastSync: daysSinceSync,
@@ -107,7 +112,7 @@ export async function determineSyncDateRange(
   // Moderate gap (7-30 days) - larger window with 1-week overlap
   if (daysSinceSync <= 30) {
     return {
-      startDate: new Date(lastSyncAt.getTime() - MODERATE_GAP_OVERLAP_DAYS * 24 * 60 * 60 * 1000),
+      startDate: new Date(mostRecentSyncPoint.getTime() - MODERATE_GAP_OVERLAP_DAYS * 24 * 60 * 60 * 1000),
       endDate: now,
       reason: 'moderate_gap',
       daysSinceLastSync: daysSinceSync,
@@ -138,6 +143,21 @@ export function getBackfillPeriod(accountType: string): number {
     return BACKFILL_PERIODS.investment;
 
   return BACKFILL_PERIODS.default;
+}
+
+function getInitialBackfillPeriod(accountType: string): number {
+  return Math.max(getBackfillPeriod(accountType), INITIAL_BACKFILL_DAYS);
+}
+
+function getMostRecentDate(
+  lastSyncAt: Date | null,
+  lastTransactionDate: Date | null
+): Date | null {
+  if (lastSyncAt && lastTransactionDate) {
+    return lastSyncAt > lastTransactionDate ? lastSyncAt : lastTransactionDate;
+  }
+
+  return lastSyncAt || lastTransactionDate || null;
 }
 
 /**
