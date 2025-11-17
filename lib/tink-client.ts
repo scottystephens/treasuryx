@@ -163,12 +163,12 @@ export function getTinkAuthorizationUrl(state: string, market: string = 'NL'): s
   console.log('   Market:', market);
   
   // Standard OAuth 2.0 parameters only - following industry best practices
-  // Include offline_access scope to ensure refresh tokens are returned
+  // Note: Tink doesn't support offline_access scope - refresh tokens are provided automatically if available
   const params = new URLSearchParams({
     client_id: TINK_CONFIG.clientId,
     redirect_uri: TINK_CONFIG.redirectUri,
     response_type: 'code',
-    scope: 'accounts:read,transactions:read,offline_access',
+    scope: 'accounts:read,transactions:read',
     state: state,
     market: market,
   });
