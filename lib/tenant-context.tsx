@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, use} from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './auth-context'
 import { supabase } from './supabase-client'
 
@@ -39,13 +40,37 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<string | null>(null)
   const { user } = useAuth()
+  const queryClient = useQueryClient()
 
-  // Fetch user's tenants
-  const fetchUserTenants = async () => {
-    if (!user) {
-      setUserTenants([])
+  const persistTenantId = (tenantId: string | null) => {
+    if (typeof window === 'undefined') return
+    if (tenantId) {
+      localStorage.setItem('currentTenantId', tenantId)
+    } else {
+      localStorage.removeItem('currentTenantId')
+    }
+  }
+
+  const applyTenantSelection = useCallback((tenant?: UserTenant) => {
+    if (tenant) {
+      setCurrentTenant(tenant.tenants)
+      setUserRole(tenant.role)
+      persistTenantId(tenant.tenant_id)
+    } else {
       setCurrentTenant(null)
       setUserRole(null)
+      persistTenantId(null)
+    }
+    queryClient.invalidateQueries({ predicate: () => true })
+  }, [queryClient])
+
+  // Fetch user's tenants
+  const fetchUserTenants = useCallback(async () => {
+    setLoading(true)
+
+    if (!user) {
+      setUserTenants([])
+      applyTenantSelection(undefined)
       setLoading(false)
       return
     }
@@ -82,48 +107,42 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         ? localStorage.getItem('currentTenantId') 
         : null
 
-      if (savedTenantId && userTenantsData.find((ut: UserTenant) => ut.tenant_id === savedTenantId)) {
-        const tenant = userTenantsData.find((ut: UserTenant) => ut.tenant_id === savedTenantId)
-        if (tenant) {
-          setCurrentTenant(tenant.tenants)
-          setUserRole(tenant.role)
-        }
+      const savedTenant = savedTenantId
+        ? userTenantsData.find((ut: UserTenant) => ut.tenant_id === savedTenantId)
+        : undefined
+
+      if (savedTenant) {
+        applyTenantSelection(savedTenant)
       } else if (userTenantsData.length > 0) {
-        setCurrentTenant(userTenantsData[0].tenants)
-        setUserRole(userTenantsData[0].role)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('currentTenantId', userTenantsData[0].tenant_id)
-        }
+        applyTenantSelection(userTenantsData[0])
+      } else {
+        applyTenantSelection(undefined)
       }
     } catch (error) {
       console.error('Error fetching user tenants:', error)
+      applyTenantSelection(undefined)
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, applyTenantSelection])
 
   // Switch tenant
   const switchTenant = (tenantId: string) => {
     const tenant = userTenants.find((ut) => ut.tenant_id === tenantId)
     if (tenant) {
-      setCurrentTenant(tenant.tenants)
-      setUserRole(tenant.role)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('currentTenantId', tenantId)
-      }
+      applyTenantSelection(tenant)
     }
   }
 
   // Refresh tenants list
   const refreshTenants = async () => {
-    setLoading(true)
     await fetchUserTenants()
   }
 
   // Load tenants when user changes
   useEffect(() => {
     fetchUserTenants()
-  }, [user])
+  }, [fetchUserTenants])
 
   return (
     <TenantContext.Provider

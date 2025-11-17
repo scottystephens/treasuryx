@@ -181,8 +181,11 @@ export function EntityGroupedView({
                   const Icon = getAccountIcon(account.account_type || '');
                   const isSynced = !!account.connection_id;
                   const providerLabel = account.connection_provider || account.provider_id;
-                  const lastSynced = account.last_synced_at
-                    ? new Date(account.last_synced_at).toLocaleDateString()
+                  const providerSyncStatus = account.provider_sync_status || (account.last_synced_at ? 'success' : 'idle');
+                  const providerSyncError = account.provider_sync_error;
+                  const providerLastSyncedAt = account.provider_last_synced_at || account.last_synced_at;
+                  const lastSynced = providerLastSyncedAt
+                    ? new Date(providerLastSyncedAt).toLocaleDateString()
                     : null;
 
                   return (
@@ -222,7 +225,11 @@ export function EntityGroupedView({
                           <span className="font-mono">{accountCurrency}</span>
                         </div>
                         {providerLabel && (
-                          <div className="flex items-center gap-2 text-[11px] text-emerald-700 font-medium">
+                          <div
+                            className={`flex items-center gap-2 text-[11px] font-medium ${
+                              providerSyncStatus === 'error' ? 'text-red-700' : 'text-emerald-700'
+                            }`}
+                          >
                             <Link2 className="h-3 w-3" />
                             <span>Synced via {providerLabel}</span>
                           </div>
@@ -232,6 +239,11 @@ export function EntityGroupedView({
                             {formatCurrency(balance, accountCurrency)}
                           </p>
                         </div>
+                        {providerSyncStatus === 'error' && providerSyncError && (
+                          <p className="text-[11px] text-red-600 mt-1 line-clamp-2">
+                            Error: {providerSyncError}
+                          </p>
+                        )}
                         {lastSynced && (
                           <p className="text-[11px] text-gray-500 text-right">
                             Last synced {lastSynced}
@@ -240,11 +252,19 @@ export function EntityGroupedView({
                       </div>
 
                       {/* Sync Badge */}
-                      {isSynced && (
+                      {isSynced && providerSyncStatus !== 'error' && (
                         <div className="absolute top-2 right-2">
                           <div className="flex items-center gap-1 px-2 py-1 bg-green-600 rounded-full">
                             <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
                             <span className="text-xs text-white font-medium">Synced</span>
+                          </div>
+                        </div>
+                      )}
+                      {isSynced && providerSyncStatus === 'error' && (
+                        <div className="absolute top-2 right-2">
+                          <div className="flex items-center gap-1 px-2 py-1 bg-red-600 rounded-full">
+                            <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
+                            <span className="text-xs text-white font-medium">Sync issue</span>
                           </div>
                         </div>
                       )}

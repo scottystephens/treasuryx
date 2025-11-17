@@ -13,17 +13,20 @@ export const transactionKeys = {
 };
 
 export interface Transaction {
-  transaction_id: string;
-  account_id: string;
-  date: string;
-  amount: number;
-  currency: string;
-  description: string;
-  type: string;
-  category?: string;
-  reference?: string;
-  counterparty_name?: string;
-  metadata?: any;
+export interface TransactionsResponse {
+  transactions: Transaction[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  count: number;
+  hasMore: boolean;
+}
+
+export interface TransactionQueryOptions {
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 /**
@@ -32,13 +35,14 @@ export interface Transaction {
 async function fetchAccountTransactions(
   tenantId: string,
   accountId: string,
-  options?: { startDate?: string; endDate?: string; limit?: number }
-): Promise<Transaction[]> {
+  options?: TransactionQueryOptions
+): Promise<TransactionsResponse> {
   const params = new URLSearchParams({
     tenantId,
     ...(options?.startDate && { startDate: options.startDate }),
     ...(options?.endDate && { endDate: options.endDate }),
-    ...(options?.limit && { limit: options.limit.toString() }),
+    ...(options?.page && { page: options.page.toString() }),
+    ...(options?.pageSize && { pageSize: options.pageSize.toString() }),
   });
   
   const response = await fetch(`/api/accounts/${accountId}/transactions?${params.toString()}`);
@@ -48,7 +52,14 @@ async function fetchAccountTransactions(
     throw new Error(data.error || 'Failed to fetch transactions');
   }
   
-  return data.transactions || [];
+  return {
+    transactions: data.transactions || [],
+    page: data.page || options?.page || 1,
+    pageSize: data.pageSize || options?.pageSize || 100,
+    totalPages: data.totalPages || 1,
+    count: data.count || 0,
+    hasMore: data.hasMore ?? false,
+  };
 }
 
 /**
@@ -57,7 +68,7 @@ async function fetchAccountTransactions(
 export function useAccountTransactions(
   tenantId: string | undefined,
   accountId: string | undefined,
-  options?: { startDate?: string; endDate?: string; limit?: number }
+  options?: TransactionQueryOptions
 ) {
   return useQuery({
     queryKey: [...transactionKeys.list(tenantId || '', accountId || ''), options],

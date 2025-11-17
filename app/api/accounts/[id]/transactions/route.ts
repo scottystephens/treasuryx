@@ -11,9 +11,14 @@ export async function GET(
   try {
     const { searchParams } = new URL(req.url);
     const tenantId = searchParams.get('tenantId');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const page = Math.max(parseInt(searchParams.get('page') || '1', 10), 1);
+    const pageSizeParam = searchParams.get('pageSize') || searchParams.get('limit');
+    const rawPageSize = pageSizeParam ? parseInt(pageSizeParam, 10) : 100;
+    const pageSize = Math.min(Math.max(rawPageSize, 1), 500);
+    const offset = (page - 1) * pageSize;
+    const rangeEnd = offset + pageSize - 1;
 
     if (!tenantId) {
       return NextResponse.json(
@@ -27,9 +32,10 @@ export async function GET(
     // Build query
     let query = supabase
       .from('transactions')
-      .select('*')
+      .select('transaction_id, account_id, date, amount, currency, description, type, category, reference, counterparty_name, counterparty_account, merchant_name, metadata', { count: 'exact' })
       .eq('tenant_id', tenantId)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .range(offset, rangeEnd);
 
     // Filter by account_id (could be UUID id or TEXT account_id)
     // Try both to handle different account ID formats
@@ -58,12 +64,7 @@ export async function GET(
       query = query.lte('date', endDate);
     }
 
-    // Limit
-    if (limit) {
-      query = query.limit(limit);
-    }
-
-    const { data: transactions, error } = await query;
+    const { data: transactions, error, count } = await query;
 
     if (error) {
       console.error('Error fetching transactions:', error);
@@ -73,10 +74,17 @@ export async function GET(
       );
     }
 
+    const totalCount = count || 0;
+    const totalPages = Math.max(Math.ceil(totalCount / pageSize), 1);
+
     return NextResponse.json({
       success: true,
       transactions: transactions || [],
-      count: transactions?.length || 0,
+      count: totalCount,
+      page,
+      pageSize,
+      totalPages,
+      hasMore: page < totalPages,
     });
   } catch (error) {
     console.error('Get transactions error:', error);

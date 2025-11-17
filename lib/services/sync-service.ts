@@ -229,6 +229,13 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
               let startDate: Date;
               let endDate: Date;
               let dateRangeInfo: Awaited<ReturnType<typeof determineSyncDateRange>> | null = null;
+              const accountSyncStart = Date.now();
+              const accountErrors: string[] = [];
+
+              const recordAccountError = (message: string) => {
+                errors.push(message);
+                accountErrors.push(message);
+              };
 
               if (transactionStartDate && transactionEndDate) {
                 startDate = new Date(transactionStartDate);
@@ -243,7 +250,8 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
                 );
 
                 if (dateRangeInfo.skip) {
-                  warnings.push(`${providerAccount.account_name}: Skipped (synced recently)`);
+                  const skipMessage = `${providerAccount.account_name}: Skipped (synced recently)`;
+                  warnings.push(skipMessage);
                   continue;
                 }
 
@@ -276,7 +284,7 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
                       .single();
 
                     if (accountError || !account?.account_id) {
-                      errors.push(`Account lookup failed for ${providerAccount.account_name}`);
+                      recordAccountError(`Account lookup failed for ${providerAccount.account_name}`);
                       continue;
                     }
 
@@ -313,7 +321,7 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
                       .single();
 
                     if (txError) {
-                      errors.push(`Failed to import transaction ${transaction.externalTransactionId}: ${txError.message}`);
+                      recordAccountError(`Failed to import transaction ${transaction.externalTransactionId}: ${txError.message}`);
                     } else {
                       transactionsSynced++;
                       
@@ -346,7 +354,7 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
                     }
                   }
                 } catch (txError) {
-                  errors.push(`Transaction import error: ${txError instanceof Error ? txError.message : String(txError)}`);
+                  recordAccountError(`Transaction import error: ${txError instanceof Error ? txError.message : String(txError)}`);
                 }
               }
 
@@ -363,8 +371,32 @@ export async function performSync(options: SyncOptions): Promise<SyncResult> {
                   .update(accountUpdates)
                   .eq('id', providerAccount.account_id);
               }
+
+              const providerSyncStatus = accountErrors.length > 0 ? 'error' : 'success';
+              const providerSyncError = accountErrors.length > 0 ? accountErrors.join('; ').slice(0, 500) : null;
+
+              await supabase
+                .from('provider_accounts')
+                .update({
+                  last_synced_at: (dateRangeInfo?.endDate || endDate || new Date()).toISOString(),
+                  last_sync_status: providerSyncStatus,
+                  last_sync_error: providerSyncError,
+                  last_sync_duration_ms: Date.now() - accountSyncStart,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', providerAccount.id);
             } catch (txFetchError) {
-              errors.push(`Account ${providerAccount.account_name}: ${provider.getErrorMessage(txFetchError)}`);
+              const message = `Account ${providerAccount.account_name}: ${provider.getErrorMessage(txFetchError)}`;
+              errors.push(message);
+              await supabase
+                .from('provider_accounts')
+                .update({
+                  last_sync_status: 'error',
+                  last_sync_error: message.slice(0, 500),
+                  last_sync_duration_ms: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', providerAccount.id);
             }
           }
         }

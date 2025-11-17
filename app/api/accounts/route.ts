@@ -37,6 +37,12 @@ export async function GET(req: NextRequest) {
             provider,
             name,
             status
+          ),
+          provider_accounts:provider_accounts_account_id_fkey(
+            last_sync_status,
+            last_sync_error,
+            last_sync_duration_ms,
+            last_synced_at
           )
         `)
         .eq('tenant_id', tenantId)
@@ -55,6 +61,14 @@ export async function GET(req: NextRequest) {
         account.connection_status = data.connections.status
       }
       account.is_synced = !!data.connection_id
+
+      if (Array.isArray(data.provider_accounts) && data.provider_accounts.length > 0) {
+        const providerMeta = data.provider_accounts[0]
+        account.provider_sync_status = providerMeta.last_sync_status
+        account.provider_sync_error = providerMeta.last_sync_error
+        account.provider_sync_duration_ms = providerMeta.last_sync_duration_ms
+        account.provider_last_synced_at = providerMeta.last_synced_at
+      }
 
       return NextResponse.json({ success: true, account });
     } else {

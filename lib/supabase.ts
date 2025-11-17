@@ -673,6 +673,10 @@ export interface Account {
   connection_name?: string
   connection_status?: string
   is_synced?: boolean // true if connection_id is not null
+  provider_sync_status?: string
+  provider_sync_error?: string | null
+  provider_sync_duration_ms?: number | null
+  provider_last_synced_at?: string | null
 }
 
 export async function getAccountsByTenant(tenantId: string, includeConnection: boolean = true) {
@@ -680,17 +684,21 @@ export async function getAccountsByTenant(tenantId: string, includeConnection: b
     // Build select query with optional connection join
     let query = supabase
       .from('accounts')
-      .select(includeConnection 
-        ? `
-          *,
-          connections:connection_id(
-            provider,
-            name,
-            status
-          )
-        `
-        : '*'
-      )
+      .select(`
+        *,
+        ${includeConnection ? `connections:connection_id(
+          provider,
+          name,
+          status
+        ),` : ''}
+        provider_accounts:provider_accounts_account_id_fkey(
+          id,
+          last_synced_at,
+          last_sync_status,
+          last_sync_error,
+          last_sync_duration_ms
+        )
+      `)
       .eq('tenant_id', tenantId)
       .order('account_name')
 
@@ -708,6 +716,20 @@ export async function getAccountsByTenant(tenantId: string, includeConnection: b
         result.connection_name = account.connections.name
         result.connection_status = account.connections.status
       }
+
+      const providerMeta = Array.isArray(account.provider_accounts) && account.provider_accounts.length > 0
+        ? account.provider_accounts[0]
+        : null
+
+      if (providerMeta) {
+        result.provider_sync_status = providerMeta.last_sync_status
+        result.provider_sync_error = providerMeta.last_sync_error
+        result.provider_sync_duration_ms = providerMeta.last_sync_duration_ms
+        result.provider_last_synced_at = providerMeta.last_synced_at
+      }
+
+      // Cleanup raw relationship payloads
+      delete (result as any).provider_accounts
       
       // Compute is_synced flag
       result.is_synced = !!account.connection_id

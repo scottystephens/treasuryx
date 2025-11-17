@@ -44,10 +44,15 @@ interface Transaction {
 export default function AccountTransactionsPage() {
   const router = useRouter();
   const params = useParams();
-  const { currentTenant } = useTenant();
+  const { currentTenant, loading: tenantLoading } = useTenant();
   const { user } = useAuth();
   const [filter, setFilter] = useState<'all' | 'credit' | 'debit'>('all');
   const [dateRange, setDateRange] = useState<'all' | '7d' | '30d' | '90d'>('30d');
+  const [page, setPage] = useState(1);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+
+  const PAGE_SIZE = 100;
 
   const accountId = params.id as string;
 
@@ -63,20 +68,61 @@ export default function AccountTransactionsPage() {
       startDate = start.toISOString().split('T')[0];
     }
 
-    return { startDate, endDate, limit: 500 };
+    return { startDate, endDate };
   }, [dateRange]);
 
   // Use React Query hooks
   const { data: account, isLoading: accountLoading } = useAccount(currentTenant?.id, accountId);
-  const { data: transactionsData = [], isLoading: transactionsLoading, refetch: refetchTransactions } = useAccountTransactions(
+  const {
+    data: transactionsResponse,
+    isLoading: transactionsLoading,
+    refetch: refetchTransactions,
+  } = useAccountTransactions(
     currentTenant?.id,
     accountId,
-    dateRangeOptions
+    {
+      ...dateRangeOptions,
+      page,
+      pageSize: PAGE_SIZE,
+    }
   );
   const syncMutation = useSyncConnection();
 
-  // Cast transactions to our local Transaction type
-  const transactions = transactionsData as Transaction[];
+  // Aggregate paginated transactions locally
+  useEffect(() => {
+    if (!transactionsResponse) return;
+
+    setHasMore(transactionsResponse.hasMore);
+
+    if (page === 1) {
+      setAllTransactions(transactionsResponse.transactions);
+      return;
+    }
+
+    setAllTransactions((prev) => {
+      const existingIds = new Set(prev.map((tx) => tx.transaction_id));
+      const merged = [...prev];
+      transactionsResponse.transactions.forEach((tx) => {
+        if (!existingIds.has(tx.transaction_id)) {
+          merged.push(tx);
+        }
+      });
+      return merged;
+    });
+  }, [transactionsResponse, page]);
+
+  // Reset pagination when date range changes
+  useEffect(() => {
+    setPage(1);
+    setAllTransactions([]);
+  }, [dateRange]);
+
+  useEffect(() => {
+    setPage(1);
+    setAllTransactions([]);
+  }, [currentTenant?.id, accountId]);
+
+  const transactions = allTransactions;
 
   const loading = accountLoading || transactionsLoading;
 
@@ -100,6 +146,7 @@ export default function AccountTransactionsPage() {
         });
         // Refetch transactions after sync completes
         setTimeout(() => {
+          setPage(1);
           refetchTransactions();
         }, 2000);
       },
@@ -155,6 +202,20 @@ export default function AccountTransactionsPage() {
     .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
   const netAmount = totalCredits - totalDebits;
+  const showLoadMore = hasMore;
+
+  if (tenantLoading) {
+    return (
+      <div className="flex h-screen">
+        <Navigation />
+        <main className="flex-1 overflow-y-auto bg-background p-8">
+          <div className="flex items-center justify-center h-full">
+            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (!currentTenant) {
     return (
@@ -368,6 +429,17 @@ export default function AccountTransactionsPage() {
                 </table>
               )}
             </div>
+            {!loading && showLoadMore && (
+              <div className="p-4 text-center border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((prev) => prev + 1)}
+                  disabled={transactionsLoading}
+                >
+                  {transactionsLoading ? 'Loading...' : 'Load more'}
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       </main>
