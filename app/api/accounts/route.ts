@@ -204,7 +204,7 @@ export async function DELETE(req: NextRequest) {
       console.error('Error checking provider accounts:', providerCountError);
     }
 
-    if (providerAccountCount > 0) {
+    if (providerAccountCount && providerAccountCount > 0) {
       return NextResponse.json(
         { 
           error: `Cannot delete account: Account is linked to ${providerAccountCount} provider account(s). Please disconnect the account from the banking provider first.`,
