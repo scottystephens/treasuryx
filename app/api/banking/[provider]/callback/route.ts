@@ -119,6 +119,18 @@ export async function GET(
       // Exchange authorization code for access token
       console.log('Exchanging code for token...');
       const tokens = await provider.exchangeCodeForToken(code);
+      
+      // Log token details (without exposing full token values)
+      console.log('✅ Token exchange successful:', {
+        providerId,
+        connectionId: connection.id,
+        hasAccessToken: !!tokens.accessToken,
+        hasRefreshToken: !!tokens.refreshToken,
+        refreshTokenLength: tokens.refreshToken?.length || 0,
+        expiresAt: tokens.expiresAt?.toISOString(),
+        tokenType: tokens.tokenType,
+        scopeCount: tokens.scope?.length || 0,
+      });
 
       // Try to get user info from provider (optional - some providers don't support it)
       let userInfo: { userId: string; name: string; email?: string; metadata?: Record<string, any> } | null = null;

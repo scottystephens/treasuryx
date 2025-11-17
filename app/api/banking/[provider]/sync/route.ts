@@ -134,11 +134,43 @@ export async function POST(
         scope: tokenData.scopes,
       };
 
+      // Log token state for debugging
+      console.log('🔑 Token state:', {
+        connectionId,
+        providerId,
+        hasRefreshToken: !!tokens.refreshToken,
+        expiresAt: tokens.expiresAt?.toISOString(),
+        isExpired: tokens.expiresAt ? provider.isTokenExpired(tokens.expiresAt) : false,
+        tokenCreatedAt: tokenData.created_at,
+        tokenUpdatedAt: tokenData.updated_at,
+      });
+
       if (tokens.expiresAt && provider.isTokenExpired(tokens.expiresAt)) {
         if (!tokens.refreshToken) {
-          throw new Error('Access token expired and no refresh token available.');
+          console.error('❌ Token expired but no refresh token available:', {
+            connectionId,
+            providerId,
+            tokenId: tokenData.id,
+            expiresAt: tokens.expiresAt.toISOString(),
+            hasRefreshTokenInDb: !!tokenData.refresh_token,
+          });
+          
+          // Update token status to indicate it needs reconnection
+          await supabase
+            .from('provider_tokens')
+            .update({
+              status: 'expired',
+              error_message: 'Access token expired and no refresh token available. Please reconnect.',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tokenData.id);
+          
+          throw new Error(
+            'Access token expired and no refresh token available. Please reconnect your Tink account by going to Connections and clicking "Reconnect".'
+          );
         }
 
+        console.log('🔄 Refreshing access token...');
         const newTokens = await provider.refreshAccessToken(tokens.refreshToken);
 
         // Update stored token
