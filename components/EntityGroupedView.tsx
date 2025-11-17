@@ -8,7 +8,7 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Landmark, CreditCard, TrendingUp, ChevronRight } from 'lucide-react';
+import { Building2, Landmark, CreditCard, TrendingUp, ChevronRight, Link2 } from 'lucide-react';
 import type { Entity } from '@/lib/types/entity';
 import type { Account } from '@/lib/supabase';
 
@@ -53,17 +53,19 @@ export function EntityGroupedView({
 
     return entitiesWithUnassigned.map(entity => {
       const entityAccounts = accountsByEntity[entity.entity_id] || [];
-      const totalBalance = entityAccounts.reduce((sum, acc) => {
+      const currencyTotals = entityAccounts.reduce((totals, acc) => {
         const balance = acc.balance ?? acc.current_balance ?? acc.available_balance ?? 0;
-        return sum + balance;
-      }, 0);
-      const currency = entityAccounts[0]?.currency || 'USD';
+        const currency = acc.currency || 'USD';
+        totals[currency] = (totals[currency] || 0) + balance;
+        return totals;
+      }, {} as Record<string, number>);
+      const primaryCurrency = entityAccounts[0]?.currency || 'USD';
 
       return {
         entity,
         accounts: entityAccounts,
-        totalBalance,
-        currency,
+        currencyTotals,
+        primaryCurrency,
       };
     });
   }, [entities, accounts]);
@@ -97,9 +99,19 @@ export function EntityGroupedView({
     return Landmark;
   };
 
+  const formatCurrencySummary = (totals: Record<string, number>) => {
+    const entries = Object.entries(totals);
+    if (entries.length === 0) {
+      return formatCurrency(0, 'USD');
+    }
+    return entries
+      .map(([currency, amount]) => formatCurrency(amount, currency))
+      .join(' • ');
+  };
+
   return (
     <div className="space-y-8">
-      {groupedData.map(({ entity, accounts: entityAccounts, totalBalance, currency }) => (
+      {groupedData.map(({ entity, accounts: entityAccounts, currencyTotals, primaryCurrency }) => (
         <div
           key={entity.entity_id}
           className="border-2 border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow"
@@ -134,8 +146,16 @@ export function EntityGroupedView({
               <div className="text-right">
                 <p className="text-sm text-gray-600 mb-1">Total Balance</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {formatCurrency(totalBalance, currency)}
+                  {formatCurrency(
+                    currencyTotals[primaryCurrency!] || 0,
+                    primaryCurrency || 'USD'
+                  )}
                 </p>
+                {Object.keys(currencyTotals).length > 1 && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    {formatCurrencySummary(currencyTotals)}
+                  </p>
+                )}
                 <p className="text-sm text-gray-500 mt-1">
                   {entityAccounts.length} account{entityAccounts.length !== 1 ? 's' : ''}
                 </p>
@@ -152,6 +172,10 @@ export function EntityGroupedView({
                   const accountCurrency = account.currency || 'USD';
                   const Icon = getAccountIcon(account.account_type || '');
                   const isSynced = !!account.connection_id;
+                  const providerLabel = account.connection_provider || account.provider_id;
+                  const lastSynced = account.last_synced_at
+                    ? new Date(account.last_synced_at).toLocaleDateString()
+                    : null;
 
                   return (
                     <div
@@ -189,11 +213,22 @@ export function EntityGroupedView({
                           <span className="capitalize">{account.account_type || 'Unknown'}</span>
                           <span className="font-mono">{accountCurrency}</span>
                         </div>
+                        {providerLabel && (
+                          <div className="flex items-center gap-2 text-[11px] text-emerald-700 font-medium">
+                            <Link2 className="h-3 w-3" />
+                            <span>Synced via {providerLabel}</span>
+                          </div>
+                        )}
                         <div className="text-right">
                           <p className={`text-lg font-bold ${balance >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
                             {formatCurrency(balance, accountCurrency)}
                           </p>
                         </div>
+                        {lastSynced && (
+                          <p className="text-[11px] text-gray-500 text-right">
+                            Last synced {lastSynced}
+                          </p>
+                        )}
                       </div>
 
                       {/* Sync Badge */}
