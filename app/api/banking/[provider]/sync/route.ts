@@ -318,47 +318,7 @@ export async function POST(
                     // Generate consistent transaction_id for linking
                     const transactionId = `${providerId}_${connectionId}_${transaction.externalTransactionId}`;
                     
-                    // ✨ STEP 1: Store in provider_transactions table with complete metadata
-                    const { data: providerTxData, error: providerTxError } = await supabase
-                      .from('provider_transactions')
-                      .upsert(
-                        {
-                          tenant_id: tenantId,
-                          connection_id: connectionId,
-                          provider_id: providerId,
-                          provider_account_id: providerAccount.id,
-                          external_transaction_id: transaction.externalTransactionId,
-                          external_account_id: providerAccount.external_account_id,
-                          amount: transaction.amount,
-                          currency: transaction.currency,
-                          description: transaction.description,
-                          transaction_type: transaction.type,
-                          counterparty_name: transaction.counterpartyName,
-                          counterparty_account: transaction.counterpartyAccount,
-                          reference: transaction.reference,
-                          category: transaction.category,
-                          transaction_date: transaction.date.toISOString(),
-                          import_status: 'pending',
-                          import_job_id: ingestionJob.id,
-                          // ✨ Store COMPLETE provider metadata (now includes raw_transaction)
-                          provider_metadata: transaction.metadata || {},
-                          // ✨ IMPORTANT: Link to main transaction (will update after creating main tx)
-                          transaction_id: transactionId,
-                        },
-                        {
-                          onConflict: 'connection_id,provider_id,external_transaction_id',
-                        }
-                      )
-                      .select()
-                      .single();
-
-                    if (providerTxError) {
-                      console.error(`Error storing provider transaction ${transaction.externalTransactionId}:`, providerTxError);
-                      errors.push(`Failed to store transaction ${transaction.externalTransactionId}: ${providerTxError.message}`);
-                      continue;
-                    }
-
-                    // ✨ STEP 2: Import to main transactions table
+                    // ✨ STEP 1: Import to main transactions table FIRST (required for foreign key)
                     // Need to get the TEXT account_id (not UUID id) from the accounts table
                     if (providerAccount.account_id) {
                       // Fetch the account to get the TEXT account_id field
@@ -415,15 +375,44 @@ export async function POST(
                         } else {
                           transactionsSynced++;
                           
-                          // ✨ STEP 3: Update provider_transactions to mark as imported
-                          if (mainTxData && providerTxData) {
-                            await supabase
-                              .from('provider_transactions')
-                              .update({
-                                import_status: 'imported',
-                                transaction_id: mainTxData.transaction_id,
-                              })
-                              .eq('id', providerTxData.id);
+                          // ✨ STEP 2: Store in provider_transactions table AFTER main transaction exists
+                          const { data: providerTxData, error: providerTxError } = await supabase
+                            .from('provider_transactions')
+                            .upsert(
+                              {
+                                tenant_id: tenantId,
+                                connection_id: connectionId,
+                                provider_id: providerId,
+                                provider_account_id: providerAccount.id,
+                                external_transaction_id: transaction.externalTransactionId,
+                                external_account_id: providerAccount.external_account_id,
+                                amount: transaction.amount,
+                                currency: transaction.currency,
+                                description: transaction.description,
+                                transaction_type: transaction.type,
+                                counterparty_name: transaction.counterpartyName,
+                                counterparty_account: transaction.counterpartyAccount,
+                                reference: transaction.reference,
+                                category: transaction.category,
+                                transaction_date: transaction.date.toISOString(),
+                                import_status: 'imported', // Mark as imported since main tx exists
+                                import_job_id: ingestionJob.id,
+                                // ✨ Store COMPLETE provider metadata (now includes raw_transaction)
+                                provider_metadata: transaction.metadata || {},
+                                // ✨ Link to main transaction (now exists)
+                                transaction_id: transactionId,
+                              },
+                              {
+                                onConflict: 'connection_id,provider_id,external_transaction_id',
+                              }
+                            )
+                            .select()
+                            .single();
+
+                          if (providerTxError) {
+                            console.error(`Error storing provider transaction ${transaction.externalTransactionId}:`, providerTxError);
+                            // Don't fail the whole sync, just log the error
+                            errors.push(`Failed to store provider transaction ${transaction.externalTransactionId}: ${providerTxError.message}`);
                           }
                         }
                       } else {
