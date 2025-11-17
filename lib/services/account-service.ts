@@ -279,7 +279,7 @@ export async function createOrUpdateProviderAccount(
     // Check if provider account already exists
     const { data: existingProviderAccount } = await supabase
       .from('provider_accounts')
-      .select('id')
+      .select('id, sync_enabled')
       .eq('connection_id', connectionId)
       .eq('provider_id', providerId)
       .eq('external_account_id', providerAccount.externalAccountId)
@@ -302,6 +302,7 @@ export async function createOrUpdateProviderAccount(
       provider_metadata: providerAccount.metadata || {},
       last_synced_at: now,
       updated_at: now,
+      sync_enabled: existingProviderAccount?.sync_enabled ?? true,
     };
 
     if (existingProviderAccount) {
