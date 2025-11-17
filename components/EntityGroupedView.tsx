@@ -54,7 +54,11 @@ export function EntityGroupedView({
     return entitiesWithUnassigned.map(entity => {
       const entityAccounts = accountsByEntity[entity.entity_id] || [];
       const currencyTotals = entityAccounts.reduce((totals, acc) => {
-        const balance = acc.balance ?? acc.current_balance ?? acc.available_balance ?? 0;
+        const balance =
+          acc.current_balance ??
+          acc.available_balance ??
+          acc.balance ??
+          0;
         const currency = acc.currency || 'USD';
         totals[currency] = (totals[currency] || 0) + balance;
         return totals;
@@ -168,7 +172,11 @@ export function EntityGroupedView({
             <div className="p-6 bg-gray-50">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {entityAccounts.map((account) => {
-                  const balance = account.balance ?? account.current_balance ?? account.available_balance ?? 0;
+                  const balance =
+                    account.current_balance ??
+                    account.available_balance ??
+                    account.balance ??
+                    0;
                   const accountCurrency = account.currency || 'USD';
                   const Icon = getAccountIcon(account.account_type || '');
                   const isSynced = !!account.connection_id;

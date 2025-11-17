@@ -58,7 +58,11 @@ export default function EntitiesPage() {
     return filteredEntities.map(entity => {
       const entityAccounts = accounts.filter(acc => acc.entity_id === entity.entity_id);
       const totalBalance = entityAccounts.reduce((sum, acc) => {
-        const balance = acc.balance ?? acc.current_balance ?? acc.available_balance ?? 0;
+        const balance =
+          acc.current_balance ??
+          acc.available_balance ??
+          acc.balance ??
+          0;
         return sum + balance;
       }, 0);
       const currencies = [...new Set(entityAccounts.map(acc => acc.currency || 'USD').filter(Boolean))];
