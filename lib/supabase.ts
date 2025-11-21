@@ -529,6 +529,10 @@ export async function updateConnection(
     next_sync_at: string
     import_mode: string
     last_error: string
+    access_token: string
+    refresh_token: string
+    expires_at: string | null
+    metadata: any
   }>
 ) {
   try {

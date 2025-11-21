@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Update connection in database
-    await updateConnection(connectionId, {
+    await updateConnection(connection.tenant_id, connectionId, {
         status: 'active',
         access_token: tokens.accessToken,
         refresh_token: tokens.refreshToken, // Plaid: Item ID
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
             ...metadata, // Plaid metadata (institution, accounts, etc.)
             provider_user_id: userInfo.userId
         },
-        last_synced_at: new Date().toISOString()
+        last_sync_at: new Date().toISOString()
     });
 
     // Trigger initial sync
@@ -83,7 +83,15 @@ export async function POST(req: NextRequest) {
     (async () => {
         try {
             console.log(`Starting initial sync for connection ${connectionId}`);
-            await performSync(connectionId, providerId, connection.tenant_id);
+            await performSync({
+                connectionId,
+                tenantId: connection.tenant_id,
+                providerId,
+                userId: user.id,
+                syncAccounts: true,
+                syncTransactions: true,
+                forceSync: true
+            });
             console.log(`Initial sync completed for connection ${connectionId}`);
         } catch (syncError) {
             console.error(`Initial sync failed for connection ${connectionId}`, syncError);

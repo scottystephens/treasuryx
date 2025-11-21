@@ -29,6 +29,7 @@ export class ProviderTemplate extends BankingProvider {
     supportedCountries: ['US'], // TODO: Add supported country codes
     website: 'https://example.com', // TODO: Provider's website
     documentationUrl: 'https://docs.example.com', // TODO: API docs URL
+    integrationType: 'redirect', // TODO: Change to 'plaid_link' if using Plaid Link flow
   };
 
   /**

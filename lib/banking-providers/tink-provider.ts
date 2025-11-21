@@ -26,6 +26,7 @@ export class TinkProvider extends BankingProvider {
     ],
     website: 'https://www.tink.com',
     documentationUrl: 'https://docs.tink.com',
+    integrationType: 'redirect',
   };
 
   validateConfiguration(): boolean {
