@@ -171,7 +171,23 @@ export class PlaidProvider extends BankingProvider {
               }
           });
 
-          console.log(`✅ Plaid sync returned: ${response.data.added.length} added, ${response.data.modified.length} modified, ${response.data.removed.length} removed`);
+          console.log(`✅ Plaid sync returned:`, {
+              added: response.data.added.length,
+              modified: response.data.modified.length,
+              removed: response.data.removed.length,
+              hasMore: response.data.has_more,
+              nextCursor: response.data.next_cursor?.substring(0, 20) + '...'
+          });
+          
+          // Log first few transactions for debugging
+          if (response.data.added.length > 0) {
+              console.log('📝 Sample Plaid transactions:', response.data.added.slice(0, 3).map(tx => ({
+                  date: tx.date,
+                  name: tx.name,
+                  amount: tx.amount,
+                  account: tx.account_id
+              })));
+          }
           
           // Filter by accountId if specified
           let transactions = response.data.added;
