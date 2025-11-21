@@ -3,6 +3,7 @@
 
 import { BankingProvider, ProviderMetadata } from './base-provider';
 import { tinkProvider } from './tink-provider';
+import { plaidProvider } from './plaid-provider';
 
 /**
  * Registry of all available banking providers
@@ -23,6 +24,14 @@ class ProviderRegistry {
         'TINK_CLIENT_SECRET',
         'TINK_REDIRECT_URI',
       ],
+    });
+
+    this.registerProvider({
+      providerId: 'plaid',
+      displayName: 'Plaid (US/CA Banks)',
+      factory: () => plaidProvider,
+      enabled: true,
+      requiredEnvVars: ['PLAID_CLIENT_ID', 'PLAID_SECRET'],
     });
 
     // Add more providers here as you build them

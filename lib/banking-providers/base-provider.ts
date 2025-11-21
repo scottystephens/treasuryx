@@ -12,6 +12,7 @@ export interface BankingProviderConfig {
   supportedCountries: string[];
   website: string;
   documentationUrl?: string;
+  integrationType: 'redirect' | 'plaid_link';
 }
 
 export interface ProviderAccount {
@@ -83,6 +84,17 @@ export abstract class BankingProvider {
    * Validate that the provider is properly configured
    */
   abstract validateConfiguration(): boolean;
+
+  // =====================================================
+  // Plaid Link Methods (Optional)
+  // =====================================================
+
+  /**
+   * Create a Link Token for Plaid Link flow
+   * @param userId - The user ID
+   * @param metadata - Optional metadata
+   */
+  async createLinkToken?(userId: string, metadata?: Record<string, any>): Promise<string>;
 
   // =====================================================
   // OAuth/Authentication Methods

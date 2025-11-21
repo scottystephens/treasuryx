@@ -88,22 +88,40 @@ export async function POST(
       oauth_state: oauthState,
     });
 
-    // Generate provider authorization URL
-    const authorizationUrl = provider.getAuthorizationUrl(oauthState, {
-      connection_id: connection.id,
-      tenant_id: tenantId,
-    });
+    let responseData: any = {
+        success: true,
+        connectionId: connection.id,
+        provider: {
+            id: providerId,
+            name: provider.config.displayName,
+            integrationType: provider.config.integrationType
+        }
+    };
 
-    return NextResponse.json({
-      success: true,
-      connectionId: connection.id,
-      authorizationUrl: authorizationUrl,
-      provider: {
-        id: providerId,
-        name: provider.config.displayName,
-      },
-      message: 'Connection created. Redirect user to authorization URL.',
-    });
+    if (provider.config.integrationType === 'plaid_link') {
+        if (!provider.createLinkToken) {
+             throw new Error('Provider is configured for Plaid Link but missing createLinkToken method');
+        }
+        
+        const linkToken = await provider.createLinkToken(user.id, {
+            connection_id: connection.id,
+            tenant_id: tenantId
+        });
+        
+        responseData.linkToken = linkToken;
+        responseData.message = 'Link token created. Initialize Plaid Link.';
+    } else {
+        // Standard OAuth redirect flow
+        const authorizationUrl = provider.getAuthorizationUrl(oauthState, {
+            connection_id: connection.id,
+            tenant_id: tenantId,
+        });
+        
+        responseData.authorizationUrl = authorizationUrl;
+        responseData.message = 'Connection created. Redirect user to authorization URL.';
+    }
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Banking authorization initiation error:', error);
     return NextResponse.json(

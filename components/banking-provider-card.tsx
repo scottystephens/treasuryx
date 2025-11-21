@@ -3,11 +3,12 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Building2 } from 'lucide-react';
+import { usePlaidLink } from 'react-plaid-link';
 
 interface BankingProvider {
   id: string;
@@ -19,6 +20,7 @@ interface BankingProvider {
   supportsSync: boolean;
   supportedCountries: string[];
   website: string;
+  integrationType?: 'redirect' | 'plaid_link';
 }
 
 interface BankingProviderCardProps {
@@ -39,6 +41,67 @@ export function BankingProviderCard({
   onError,
 }: BankingProviderCardProps) {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+
+  // Plaid Link Hook Configuration
+  const { open: openPlaidLink, ready: plaidReady } = usePlaidLink({
+    token: plaidLinkToken,
+    onSuccess: async (public_token, metadata) => {
+      try {
+        setIsConnecting(true);
+        // Exchange the public token for an access token
+        const response = await fetch('/api/banking/plaid/exchange-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publicToken: public_token,
+            connectionId: connectionId,
+            metadata: metadata
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to exchange token');
+        }
+
+        if (onConnect) onConnect();
+        // Ideally redirect or show success
+        window.location.href = '/connections'; 
+
+      } catch (err) {
+        console.error('Plaid exchange error:', err);
+        handleError(err);
+      } finally {
+        setIsConnecting(false);
+      }
+    },
+    onExit: (err, metadata) => {
+      setIsConnecting(false);
+      if (err) handleError(err);
+    },
+  });
+
+  // Trigger Plaid Link when token is ready
+  useEffect(() => {
+    if (plaidLinkToken && plaidReady) {
+      openPlaidLink();
+    }
+  }, [plaidLinkToken, plaidReady, openPlaidLink]);
+
+  const handleError = (error: any) => {
+    const errorMessage =
+        error instanceof Error ? error.message : `Failed to connect to ${provider.displayName}`;
+      
+      if (onError) {
+        onError(errorMessage);
+      } else {
+        alert(`Error: ${errorMessage}`);
+      }
+      setIsConnecting(false);
+  }
 
   async function handleConnect() {
     try {
@@ -63,21 +126,24 @@ export function BankingProviderCard({
         throw new Error(data.error || `Failed to connect to ${provider.displayName}`);
       }
 
-      // Standard OAuth 2.0 redirect flow - no workarounds
-      // This is the industry-standard approach for all OAuth providers
-      window.location.href = data.authorizationUrl;
-    } catch (error) {
-      console.error('Provider connection error:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : `Failed to connect to ${provider.displayName}`;
-
-      if (onError) {
-        onError(errorMessage);
-      } else {
-        alert(`Error: ${errorMessage}`);
+      // Handle Plaid Link Flow
+      if (data.linkToken) {
+          setConnectionId(data.connectionId);
+          setPlaidLinkToken(data.linkToken);
+          // The useEffect will trigger openPlaidLink when ready
+          return;
       }
 
-      setIsConnecting(false);
+      // Handle Standard Redirect Flow
+      if (data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      } else {
+         throw new Error('Invalid response from authorization endpoint');
+      }
+
+    } catch (error) {
+      console.error('Provider connection error:', error);
+      handleError(error);
     }
   }
 
@@ -166,4 +232,3 @@ export function BankingProviderCard({
     </Card>
   );
 }
-
