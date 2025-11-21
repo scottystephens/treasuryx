@@ -178,7 +178,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       connectionId: connection.id,
-      redirectUrl: `/connections/${connection.id}`, // Redirect to connection detail page
+      redirectUrl: `/connections/${connection.id}?syncing=true&jobId=${ingestionJob.id}`, // Redirect with sync status
+      message: 'Connection successful! Syncing accounts and transactions...'
     });
 
   } catch (error) {

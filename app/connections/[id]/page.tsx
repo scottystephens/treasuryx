@@ -122,6 +122,10 @@ export default function ConnectionDetailPage() {
     if (syncingParam && jobIdParam) {
       setIsSyncing(true);
       setSyncJobId(jobIdParam);
+      toast.info('Syncing your bank data', {
+        description: 'Please wait while we fetch your accounts and transactions. This may take a few moments.',
+        duration: 10000
+      });
       // Remove syncing param from URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('syncing');

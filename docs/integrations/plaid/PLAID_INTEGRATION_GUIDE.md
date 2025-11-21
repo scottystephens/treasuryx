@@ -264,6 +264,22 @@ This provides sample data for testing.
 - Sample transactions
 - All features enabled
 
+### Important: Transaction Availability
+
+⚠️ **Plaid Sandbox Transaction Delay**: In sandbox mode, transactions may not be immediately available after the initial OAuth. Plaid's API requires:
+
+1. **Initial Update**: Can take 30-60 seconds for transactions to appear
+2. **Historical Update**: Full transaction history may take several minutes
+3. **Webhook Notification**: Plaid sends `INITIAL_UPDATE` webhook when ready
+
+**What you'll see**:
+- Account is created immediately with current balance
+- Transactions sync in the background
+- Page shows "Syncing..." status
+- Refresh the page after 1-2 minutes to see transactions
+
+**For production**: Implement webhook handlers to automatically refresh when Plaid sends `INITIAL_UPDATE` or `HISTORICAL_UPDATE` events.
+
 ### Test Flow
 
 1. Navigate to `/connections/new`
