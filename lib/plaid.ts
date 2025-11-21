@@ -10,12 +10,14 @@ if (!PLAID_CLIENT_ID || !PLAID_SECRET) {
   console.warn('Plaid credentials not configured. Provider will be disabled.');
 }
 
+// Official Plaid Node SDK configuration as per https://plaid.com/docs/
 const configuration = new Configuration({
   basePath: PlaidEnvironments[PLAID_ENV],
   baseOptions: {
     headers: {
       'PLAID-CLIENT-ID': PLAID_CLIENT_ID || '',
       'PLAID-SECRET': PLAID_SECRET || '',
+      'Plaid-Version': '2020-09-14', // Use latest stable API version
     },
   },
 });
