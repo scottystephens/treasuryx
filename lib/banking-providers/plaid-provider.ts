@@ -191,8 +191,15 @@ export class PlaidProvider extends BankingProvider {
           
           // Filter by accountId if specified
           let transactions = response.data.added;
+          
+          console.log(`🔍 Plaid returned ${transactions.length} total transactions`);
           if (accountId) {
-              transactions = transactions.filter(tx => tx.account_id === accountId);
+              console.log(`🔍 Filtering for accountId: ${accountId}`);
+              console.log(`🔍 Sample transaction account_ids:`, transactions.slice(0, 3).map(tx => tx.account_id));
+              
+              const filtered = transactions.filter(tx => tx.account_id === accountId);
+              console.log(`🔍 After filter: ${filtered.length} transactions match accountId ${accountId}`);
+              transactions = filtered;
           }
 
           // Apply date filtering if specified

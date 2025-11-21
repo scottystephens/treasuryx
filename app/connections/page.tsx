@@ -39,12 +39,13 @@ export default function ConnectionsPage() {
   const syncMutation = useSyncConnection();
 
   useEffect(() => {
-    // If no tenant at all, redirect to onboarding
-    if (userTenants.length === 0 && !loading) {
+    // Only redirect to onboarding if user genuinely has no organizations AND is not loading
+    // Don't redirect just because connections list is empty
+    if (userTenants.length === 0 && !loading && !currentTenant) {
       router.push('/onboarding');
       return;
     }
-  }, [userTenants, loading, router]);
+  }, [userTenants, loading, currentTenant, router]);
 
   // Show error toast if query fails
   useEffect(() => {
