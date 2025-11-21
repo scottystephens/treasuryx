@@ -76,7 +76,7 @@ export default function AccountsPage() {
     <div className="flex h-screen">
       <Navigation />
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="p-6">
           {/* Compact Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
