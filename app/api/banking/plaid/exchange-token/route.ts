@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { getProvider } from '@/lib/banking-providers/provider-registry';
-import { updateConnection } from '@/lib/supabase';
+import { supabase, updateConnection, createIngestionJob, updateIngestionJob } from '@/lib/supabase';
 import { performSync } from '@/lib/services/sync-service';
 
 export async function POST(req: NextRequest) {
@@ -52,30 +52,68 @@ export async function POST(req: NextRequest) {
     const tokens = await provider.exchangeCodeForToken(publicToken);
 
     // Get user info from provider if possible
-    let userInfo = { userId: user.id, name: 'Plaid User' };
+    let userInfo = { userId: user.id, name: 'Plaid User', metadata: {} };
     try {
         const providerUser = await provider.fetchUserInfo({
             connectionId: connection.id,
             tenantId: connection.tenant_id,
             tokens: tokens
         });
-        userInfo = { userId: providerUser.userId, name: providerUser.name };
+        userInfo = { 
+            userId: providerUser.userId, 
+            name: providerUser.name,
+            metadata: providerUser.metadata || {}
+        };
     } catch (e) {
         console.warn('Could not fetch provider user info, using defaults', e);
     }
 
-    // Update connection in database
+    // Store token in provider_tokens table (this is what the sync API looks for)
+    const { data: tokenData, error: tokenError } = await supabase
+        .from('provider_tokens')
+        .upsert({
+            tenant_id: connection.tenant_id,
+            connection_id: connection.id,
+            provider_id: providerId,
+            access_token: tokens.accessToken,
+            refresh_token: tokens.refreshToken || null,
+            token_type: tokens.tokenType || 'Bearer',
+            expires_at: tokens.expiresAt?.toISOString() || null,
+            scopes: tokens.scope || [],
+            provider_user_id: userInfo.userId,
+            provider_metadata: { ...userInfo.metadata, ...metadata },
+            status: 'active',
+        }, {
+            onConflict: 'connection_id,provider_id',
+            ignoreDuplicates: false
+        })
+        .select()
+        .single();
+
+    if (tokenError) {
+        console.error('Error storing OAuth token:', tokenError);
+        throw new Error('Failed to store OAuth token');
+    }
+
+    console.log('✅ OAuth token stored successfully:', {
+        tokenId: tokenData.id,
+        connectionId: connection.id,
+        providerId,
+        hasRefreshToken: !!tokenData.refresh_token,
+    });
+
+    // Update connection status
     await updateConnection(connection.tenant_id, connectionId, {
         status: 'active',
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken, // Plaid: Item ID
-        expires_at: null, // Plaid tokens don't expire
-        metadata: {
-            ...connection.metadata,
-            ...metadata, // Plaid metadata (institution, accounts, etc.)
-            provider_user_id: userInfo.userId
-        },
         last_sync_at: new Date().toISOString()
+    });
+
+    // Create ingestion job for tracking sync progress
+    const ingestionJob = await createIngestionJob({
+        tenant_id: connection.tenant_id,
+        connection_id: connection.id,
+        job_type: 'oauth_initial_sync',
+        status: 'pending',
     });
 
     // Trigger initial sync
@@ -83,24 +121,50 @@ export async function POST(req: NextRequest) {
     (async () => {
         try {
             console.log(`Starting initial sync for connection ${connectionId}`);
-            await performSync({
+            
+            await updateIngestionJob(ingestionJob.id, {
+                status: 'in_progress',
+            });
+
+            const syncResult = await performSync({
                 connectionId,
                 tenantId: connection.tenant_id,
                 providerId,
                 userId: user.id,
                 syncAccounts: true,
                 syncTransactions: true,
-                forceSync: true
+                forceSync: true,
+                jobId: ingestionJob.id,
             });
-            console.log(`Initial sync completed for connection ${connectionId}`);
+
+            const summary = (syncResult as any).summary || {};
+            if (syncResult.success) {
+                await updateIngestionJob(ingestionJob.id, {
+                    status: 'completed',
+                    records_processed: (summary.accountsSynced || 0) + (summary.transactionsSynced || 0),
+                    records_imported: (summary.accountsSynced || 0) + (summary.transactionsSynced || 0),
+                });
+            } else {
+                await updateIngestionJob(ingestionJob.id, {
+                    status: 'failed',
+                    error_message: (syncResult as any).error || 'Sync failed',
+                });
+            }
+
+            console.log(`Initial sync completed for connection ${connectionId}`, syncResult);
         } catch (syncError) {
             console.error(`Initial sync failed for connection ${connectionId}`, syncError);
+            await updateIngestionJob(ingestionJob.id, {
+                status: 'failed',
+                error_message: syncError instanceof Error ? syncError.message : 'Sync failed',
+            });
         }
     })();
 
     return NextResponse.json({
       success: true,
       connectionId: connection.id,
+      redirectUrl: `/connections/${connection.id}`, // Redirect to connection detail page
     });
 
   } catch (error) {

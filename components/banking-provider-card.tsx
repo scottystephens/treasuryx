@@ -50,6 +50,8 @@ export function BankingProviderCard({
     onSuccess: async (public_token, metadata) => {
       try {
         setIsConnecting(true);
+        console.log('Plaid Link success, exchanging token...');
+        
         // Exchange the public token for an access token
         const response = await fetch('/api/banking/plaid/exchange-token', {
           method: 'POST',
@@ -57,7 +59,11 @@ export function BankingProviderCard({
           body: JSON.stringify({
             publicToken: public_token,
             connectionId: connectionId,
-            metadata: metadata
+            metadata: {
+              institution: metadata.institution,
+              accounts: metadata.accounts,
+              link_session_id: metadata.link_session_id,
+            }
           }),
         });
 
@@ -67,9 +73,12 @@ export function BankingProviderCard({
             throw new Error(data.error || 'Failed to exchange token');
         }
 
+        console.log('Token exchange successful, redirecting...');
+        
         if (onConnect) onConnect();
-        // Ideally redirect or show success
-        window.location.href = '/connections'; 
+        
+        // Redirect to the connection detail page
+        window.location.href = data.redirectUrl || `/connections/${data.connectionId}`;
 
       } catch (err) {
         console.error('Plaid exchange error:', err);
@@ -80,7 +89,12 @@ export function BankingProviderCard({
     },
     onExit: (err, metadata) => {
       setIsConnecting(false);
-      if (err) handleError(err);
+      if (err) {
+        console.error('Plaid Link exited with error:', err);
+        handleError(err);
+      } else {
+        console.log('Plaid Link exited without completing');
+      }
     },
   });
 
