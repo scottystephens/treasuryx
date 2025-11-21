@@ -3,15 +3,19 @@ import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID;
 const PLAID_SECRET = process.env.PLAID_SECRET;
 
-// Default to sandbox if not specified, but check environment
-const PLAID_ENV = process.env.PLAID_ENV || 'sandbox';
+// Default to sandbox if not specified
+const PLAID_ENV = (process.env.PLAID_ENV || 'sandbox') as keyof typeof PlaidEnvironments;
+
+if (!PLAID_CLIENT_ID || !PLAID_SECRET) {
+  console.warn('Plaid credentials not configured. Provider will be disabled.');
+}
 
 const configuration = new Configuration({
   basePath: PlaidEnvironments[PLAID_ENV],
   baseOptions: {
     headers: {
-      'PLAID-CLIENT-ID': PLAID_CLIENT_ID,
-      'PLAID-SECRET': PLAID_SECRET,
+      'PLAID-CLIENT-ID': PLAID_CLIENT_ID || '',
+      'PLAID-SECRET': PLAID_SECRET || '',
     },
   },
 });

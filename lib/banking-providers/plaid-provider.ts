@@ -36,19 +36,32 @@ export class PlaidProvider extends BankingProvider {
 
   async createLinkToken(userId: string, metadata?: Record<string, any>): Promise<string> {
     try {
+      console.log('Creating Plaid Link token for user:', userId);
+      console.log('Plaid config:', {
+        hasClientId: !!process.env.PLAID_CLIENT_ID,
+        hasSecret: !!process.env.PLAID_SECRET,
+        env: process.env.PLAID_ENV,
+        products: PLAID_PRODUCTS,
+        countryCodes: PLAID_COUNTRY_CODES
+      });
+
       const response = await plaidClient.linkTokenCreate({
         user: { client_user_id: userId },
         client_name: 'Stratifi',
         products: PLAID_PRODUCTS as Products[],
         country_codes: PLAID_COUNTRY_CODES as CountryCode[],
         language: 'en',
-        webhook: process.env.PLAID_WEBHOOK_URL, // Optional
-        redirect_uri: process.env.PLAID_REDIRECT_URI, // Only required for OAuth banks in prod
       });
+      
+      console.log('Plaid Link token created successfully');
       return response.data.link_token;
-    } catch (error) {
-      console.error('Error creating Plaid Link token:', error);
-      throw new Error('Failed to initialize Plaid Link');
+    } catch (error: any) {
+      console.error('Error creating Plaid Link token:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      throw new Error(`Failed to initialize Plaid Link: ${error?.response?.data?.error_message || error?.message}`);
     }
   }
 
