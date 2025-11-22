@@ -77,12 +77,19 @@ export async function syncPlaidAccounts(
           });
 
         // Find the normalized account to create statement
-        const { data: normalizedAccount } = await supabase
+        // Query by external_account_id which is set to Plaid's account_id during account creation
+        const { data: normalizedAccount, error: accountLookupError } = await supabase
           .from('accounts')
-          .select('id, currency')
+          .select('id, currency, account_name')
           .eq('tenant_id', tenantId)
-          .eq('provider_account_id', account.account_id)
-          .single();
+          .eq('connection_id', connectionId)
+          .eq('external_account_id', account.account_id)
+          .maybeSingle();
+
+        if (accountLookupError) {
+          console.error(`Error looking up account for ${account.name}:`, accountLookupError);
+          errors.push(`Failed to lookup account ${account.name}: ${accountLookupError.message}`);
+        }
 
         if (normalizedAccount) {
           // Create daily balance statement
@@ -105,11 +112,15 @@ export async function syncPlaidAccounts(
             confidence: 'high',
             metadata: {
               plaid_account_id: account.account_id,
+              plaid_account_name: account.name,
               synced_at: new Date().toISOString(),
             },
           });
 
-          console.log(`✅ Created statement for account ${account.name} (${currency} ${endingBalance})`);
+          console.log(`✅ Created statement for account ${normalizedAccount.account_name} (${currency} ${endingBalance})`);
+        } else {
+          console.warn(`⚠️  No normalized account found for Plaid account ${account.name} (${account.account_id})`);
+          errors.push(`No account found for Plaid account ${account.name} - statement not created`);
         }
       } catch (error) {
         errors.push(`Failed to store Plaid account ${account.name}: ${error}`);
