@@ -11,9 +11,10 @@
  * 4. Handles added/modified/removed transactions
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, upsertAccountStatement } from '@/lib/supabase';
 import { plaidClient } from '@/lib/plaid';
 import type { Transaction as PlaidTransaction, AccountBase as PlaidAccount } from 'plaid';
+import { convertAmountToUsd } from '@/lib/currency';
 
 export interface PlaidSyncResult {
   success: boolean;
@@ -48,9 +49,10 @@ export async function syncPlaidAccounts(
     const plaidAccounts = response.data.accounts;
     console.log(`✅ Retrieved ${plaidAccounts.length} accounts from Plaid`);
 
-    // Store raw Plaid account data
+    // Store raw Plaid account data AND create daily statement records
     for (const account of plaidAccounts) {
       try {
+        // Store raw Plaid data
         await supabase
           .from('plaid_accounts')
           .upsert({
@@ -74,6 +76,42 @@ export async function syncPlaidAccounts(
           }, {
             onConflict: 'connection_id,account_id'
           });
+
+        // Find the normalized account to create statement
+        const { data: normalizedAccount } = await supabase
+          .from('accounts')
+          .select('id, currency')
+          .eq('tenant_id', tenantId)
+          .eq('provider_account_id', account.account_id)
+          .single();
+
+        if (normalizedAccount) {
+          // Create daily balance statement
+          const currency = account.balances.iso_currency_code || normalizedAccount.currency || 'USD';
+          const endingBalance = account.balances.current || 0;
+          const availableBalance = account.balances.available || null;
+          
+          // Convert to USD
+          const usdEquivalent = await convertAmountToUsd(endingBalance, currency);
+
+          await upsertAccountStatement({
+            tenantId,
+            accountId: normalizedAccount.id,
+            statementDate: new Date().toISOString().split('T')[0], // Today's date
+            endingBalance,
+            availableBalance: availableBalance ?? undefined,
+            currency,
+            usdEquivalent: usdEquivalent ?? undefined,
+            source: 'synced',
+            confidence: 'high',
+            metadata: {
+              plaid_account_id: account.account_id,
+              synced_at: new Date().toISOString(),
+            },
+          });
+
+          console.log(`✅ Created statement for account ${account.name} (${currency} ${endingBalance})`);
+        }
       } catch (error) {
         errors.push(`Failed to store Plaid account ${account.name}: ${error}`);
         console.error('Error storing Plaid account:', error);
