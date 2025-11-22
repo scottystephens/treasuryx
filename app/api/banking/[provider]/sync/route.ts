@@ -26,6 +26,7 @@ import {
   formatSyncMetrics,
 } from '@/lib/services/transaction-sync-service';
 import { performPlaidSync } from '@/lib/services/plaid-sync-service';
+import { performTinkSync } from '@/lib/services/tink-sync-service';
 
 export async function POST(
   req: NextRequest,
@@ -108,6 +109,78 @@ export async function POST(
 
       try {
         const result = await performPlaidSync(
+          tenantId,
+          connectionId,
+          tokenData.access_token,
+          {
+            syncAccounts,
+            syncTransactions,
+            forceFullSync: forceSync,
+            importJobId: ingestionJob.id,
+          }
+        );
+
+        // Update job status
+        await updateIngestionJob(ingestionJob.id, {
+          status: result.success ? 'completed' : 'completed_with_errors',
+          records_fetched: result.accountsSynced + (result.transactionsAdded || 0),
+          records_imported: result.accountsSynced + (result.transactionsImported || 0),
+          records_failed: (result.errors?.length || 0),
+          completed_at: new Date().toISOString(),
+          summary: result,
+        });
+
+        // Update connection last_sync_at
+        await updateConnection(tenantId, connectionId, {
+          last_sync_at: new Date().toISOString(),
+        });
+
+        return NextResponse.json({
+          success: result.success,
+          message: `Synced ${result.accountsSynced} accounts and ${result.transactionsImported} transactions`,
+          summary: result,
+          jobId: ingestionJob.id,
+        });
+      } catch (error) {
+        // Update job as failed
+        await updateIngestionJob(ingestionJob.id, {
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          completed_at: new Date().toISOString(),
+        });
+        throw error;
+      }
+    }
+
+    // 🚀 Use Optimized Tink Sync Service if provider is Tink
+    if (providerId === 'tink') {
+      console.log('🚀 Using optimized Tink sync service...');
+      
+      // Get active token
+      const { data: tokenData } = await supabase
+        .from('provider_tokens')
+        .select('access_token')
+        .eq('connection_id', connectionId)
+        .eq('provider_id', 'tink')
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!tokenData?.access_token) {
+        throw new Error('No active Tink access token found');
+      }
+
+      // Create ingestion job for tracking
+      const ingestionJob = await createIngestionJob({
+        tenant_id: tenantId,
+        connection_id: connectionId,
+        job_type: 'tink_sync',
+        status: 'running',
+      });
+
+      try {
+        const result = await performTinkSync(
           tenantId,
           connectionId,
           tokenData.access_token,

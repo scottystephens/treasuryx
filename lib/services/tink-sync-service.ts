@@ -12,7 +12,7 @@
  * 4. Handles full account and transaction sync
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, upsertAccountStatement, convertAmountToUsd } from '@/lib/supabase';
 import * as TinkClient from '@/lib/tink-client';
 import type { TinkAccount, TinkTransaction } from '@/lib/tink-client';
 
@@ -89,13 +89,61 @@ export async function syncTinkAccounts(
             created: account.created,
             raw_data: account as any,
             last_updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'connection_id,account_id'
+        // Find the normalized account to create statement
+        // Query by external_account_id which is set to Tink's account_id during account creation
+        const { data: normalizedAccount, error: accountLookupError } = await supabase
+          .from('accounts')
+          .select('id, currency, account_name')
+          .eq('tenant_id', tenantId)
+          .eq('connection_id', connectionId)
+          .eq('external_account_id', account.id)
+          .maybeSingle();
+
+        if (accountLookupError) {
+          console.error(`Error looking up account for ${account.name}:`, accountLookupError);
+          errors.push(`Failed to lookup account ${account.name}: ${accountLookupError.message}`);
+        }
+
+        if (normalizedAccount) {
+          // ✨ Link Tink account to Stratifi account
+          // This is required for transaction import to work
+          await supabase
+            .from('tink_accounts')
+            .update({ stratifi_account_id: normalizedAccount.id })
+            .eq('connection_id', connectionId)
+            .eq('account_id', account.id);
+
+          // Create daily balance statement
+          const currency = currencyCode || normalizedAccount.currency || 'EUR';
+          
+          // Prefer booked balance, fallback to available
+          const endingBalance = balanceBooked || balanceAvailable || 0;
+          const availableBalance = balanceAvailable || undefined;
+          
+          // Convert to USD (Tink is mostly EUR)
+          const usdEquivalent = await convertAmountToUsd(endingBalance, currency);
+
+          await upsertAccountStatement({
+            tenantId,
+            accountId: normalizedAccount.id,
+            statementDate: new Date().toISOString().split('T')[0], // Today's date
+            endingBalance,
+            availableBalance,
+            currency,
+            usdEquivalent: usdEquivalent ?? undefined,
+            source: 'synced',
+            confidence: 'high',
+            metadata: {
+              tink_account_id: account.id,
+              tink_account_name: account.name,
+              synced_at: new Date().toISOString(),
+            },
           });
-      } catch (error) {
-        errors.push(`Failed to store Tink account ${account.name}: ${error}`);
-        console.error('Error storing Tink account:', error);
-      }
+
+          console.log(`✅ Created statement for account ${normalizedAccount.account_name} (${currency} ${endingBalance})`);
+        } else {
+          console.warn(`⚠️  No normalized account found for Tink account ${account.name} (${account.id})`);
+        }
     }
 
     return { accounts: tinkAccounts, errors };

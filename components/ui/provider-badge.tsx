@@ -19,9 +19,9 @@ const PROVIDER_COLORS: Record<string, { bg: string; text: string }> = {
     bg: 'bg-blue-100',
     text: 'text-blue-800',
   },
-  bunq: {
-    bg: 'bg-orange-100',
-    text: 'text-orange-800',
+  plaid: {
+    bg: 'bg-green-100',
+    text: 'text-green-800',
   },
   // Default fallback
   default: {
@@ -33,7 +33,7 @@ const PROVIDER_COLORS: Record<string, { bg: string; text: string }> = {
 // Provider display names
 const PROVIDER_NAMES: Record<string, string> = {
   tink: 'Tink',
-  bunq: 'Bunq',
+  plaid: 'Plaid',
 };
 
 export function ProviderBadge({

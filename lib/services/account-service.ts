@@ -4,7 +4,7 @@
  * Follows industry best practices: type safety, error handling, logging, transactions
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, upsertAccountStatement, convertAmountToUsd } from '@/lib/supabase';
 import { Account } from '@/lib/supabase';
 import type { ProviderAccount } from '@/lib/banking-providers/base-provider';
 
@@ -190,6 +190,26 @@ export async function createOrUpdateAccount(
 
       console.log(`✅ Updated existing account: ${existingAccount.account_name} (matched by ${matchedBy})`);
 
+      // ✨ Create daily balance statement
+      const currency = providerAccount.currency || existingAccount.currency || 'USD';
+      const usdEquivalent = await convertAmountToUsd(providerAccount.balance, currency);
+
+      await upsertAccountStatement({
+        tenantId,
+        accountId: updatedAccount.id,
+        statementDate: new Date().toISOString().split('T')[0],
+        endingBalance: providerAccount.balance,
+        availableBalance: undefined, // Generic provider interface doesn't always separate booked/available
+        currency,
+        usdEquivalent: usdEquivalent ?? undefined,
+        source: 'synced',
+        confidence: 'high',
+        metadata: {
+          provider_account_id: providerAccount.externalAccountId,
+          synced_at: now,
+        },
+      });
+
       return {
         success: true,
         account: updatedAccount,
@@ -239,6 +259,27 @@ export async function createOrUpdateAccount(
       }
 
       console.log(`✅ Created new account: ${providerAccount.accountName}`);
+
+      // ✨ Create initial daily balance statement
+      const currency = providerAccount.currency || 'USD';
+      const usdEquivalent = await convertAmountToUsd(providerAccount.balance, currency);
+
+      await upsertAccountStatement({
+        tenantId,
+        accountId: createdAccount.id,
+        statementDate: new Date().toISOString().split('T')[0],
+        endingBalance: providerAccount.balance,
+        availableBalance: undefined,
+        currency,
+        usdEquivalent: usdEquivalent ?? undefined,
+        source: 'synced',
+        confidence: 'high',
+        metadata: {
+          provider_account_id: providerAccount.externalAccountId,
+          synced_at: now,
+          is_initial: true
+        },
+      });
 
       return {
         success: true,
