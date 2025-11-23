@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
         status: 'pending',
     });
 
-    // Trigger initial sync
+    // Trigger initial sync with reconnection detection
     // Run in background so we respond quickly to UI
     (async () => {
         try {
@@ -152,6 +152,67 @@ export async function POST(req: NextRequest) {
               },
             };
 
+            // STEP 1: Fetch accounts first to detect reconnection
+            console.log('[Reconnection] Fetching accounts to check for reconnection...');
+            const rawAccounts = await provider.fetchRawAccounts(credentials);
+            
+            // STEP 2: Check if this is a reconnection
+            const { detectReconnection, linkConnectionToAccounts, linkConnectionToTransactions, recordReconnectionEvent, getReconnectionSyncStartDate } = await import('@/lib/services/reconnection-service');
+            
+            const reconnectionMatch = await detectReconnection({
+              tenantId: connection.tenant_id,
+              providerId,
+              institutionId: rawAccounts.institution?.id,
+              institutionName: rawAccounts.institution?.name,
+              externalAccountIds: rawAccounts.accounts.map((acc: any) => acc.account_id),
+              accountNumbers: rawAccounts.accounts.map((acc: any) => acc.mask || acc.account?.mask).filter(Boolean),
+              ibans: rawAccounts.accounts.map((acc: any) => acc.iban).filter(Boolean),
+            });
+
+            let syncStartDate: string | undefined;
+            
+            if (reconnectionMatch.isReconnection && reconnectionMatch.recommendation === 'link_and_resume') {
+              console.log(`[Reconnection] 🔗 RECONNECTION DETECTED! Confidence: ${reconnectionMatch.matchedAccounts[0]?.matchConfidence}`);
+              console.log(`[Reconnection] Found ${reconnectionMatch.matchedAccounts.length} matching accounts`);
+              console.log(`[Reconnection] ${reconnectionMatch.totalTransactions} existing transactions`);
+              console.log(`[Reconnection] Date range: ${reconnectionMatch.oldestTransactionDate} to ${reconnectionMatch.newestTransactionDate}`);
+              
+              // Link existing accounts to new connection
+              const accountIds = reconnectionMatch.matchedAccounts.map(acc => acc.accountId);
+              await linkConnectionToAccounts(connectionId, accountIds);
+              await linkConnectionToTransactions(connectionId, accountIds);
+              
+              // Update connection metadata
+              await supabase
+                .from('connections')
+                .update({
+                  is_reconnection: true,
+                  reconnected_from: reconnectionMatch.previousConnectionId,
+                  reconnection_confidence: reconnectionMatch.matchedAccounts[0]?.matchConfidence,
+                })
+                .eq('id', connectionId);
+              
+              // Record reconnection event
+              await recordReconnectionEvent(
+                connection.tenant_id,
+                connectionId,
+                reconnectionMatch.previousConnectionId,
+                reconnectionMatch.matchedAccounts.length,
+                reconnectionMatch.totalTransactions,
+                reconnectionMatch.matchedAccounts[0]?.matchConfidence
+              );
+              
+              // Get smart sync start date (resume from last transaction)
+              const smartStartDate = await getReconnectionSyncStartDate(accountIds);
+              if (smartStartDate) {
+                syncStartDate = smartStartDate.toISOString();
+                console.log(`[Reconnection] Smart sync: Resuming from ${syncStartDate} (skipping ${reconnectionMatch.totalTransactions} existing transactions)`);
+              }
+            } else {
+              console.log('[Reconnection] No reconnection detected - treating as new connection');
+            }
+
+            // STEP 3: Run full orchestrated sync (with smart start date for reconnections)
             const syncResult = await orchestrateSync({
               provider,
               connectionId,
@@ -160,6 +221,7 @@ export async function POST(req: NextRequest) {
               syncAccounts: true,
               syncTransactions: true,
               userId: user.id,
+              startDate: syncStartDate, // Use smart date for reconnections
             });
 
             if (syncResult.success) {
@@ -171,10 +233,13 @@ export async function POST(req: NextRequest) {
                     summary: {
                         accounts_synced: syncResult.accountsSynced,
                         transactions_synced: syncResult.transactionsSynced,
-                        accounts_created: syncResult.accountsSynced,  // For initial sync, all are new
-                        accounts_updated: 0,
+                        accounts_created: reconnectionMatch.isReconnection ? 0 : syncResult.accountsSynced,
+                        accounts_updated: reconnectionMatch.isReconnection ? syncResult.accountsSynced : 0,
                         errors: syncResult.errors,
                         duration_ms: syncResult.duration,
+                        is_reconnection: reconnectionMatch.isReconnection,
+                        reconnection_confidence: reconnectionMatch.matchedAccounts[0]?.matchConfidence,
+                        existing_transactions: reconnectionMatch.totalTransactions,
                     },
                 });
             } else {

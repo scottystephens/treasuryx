@@ -451,10 +451,22 @@ export default function ConnectionDetailPage() {
 
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-bold">{connection.name}</h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-bold">{connection.name}</h1>
+                  {connection.is_reconnection && (
+                    <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1">
+                      🔗 Reconnected
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-muted-foreground mt-2">
                   {connection.provider?.toUpperCase() || connection.connection_type.toUpperCase()} Connection
                 </p>
+                {connection.is_reconnection && connection.reconnection_confidence && (
+                  <p className="text-sm text-blue-600 mt-1">
+                    Automatically linked to existing accounts ({connection.reconnection_confidence} confidence)
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 {connection.provider && (
@@ -567,6 +579,24 @@ export default function ConnectionDetailPage() {
           {connection.sync_summary && (
             <Card className="p-6 mb-6">
               <h2 className="text-xl font-semibold mb-4">Last Sync Summary</h2>
+              
+              {/* Reconnection Info */}
+              {connection.sync_summary.is_reconnection && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-blue-800 font-semibold">🔗 Reconnection Detected</span>
+                    <Badge className="bg-blue-100 text-blue-700">
+                      {connection.sync_summary.reconnection_confidence} confidence
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    Automatically linked to {connection.total_accounts} existing accounts with{' '}
+                    {connection.sync_summary.existing_transactions || 0} historical transactions.
+                    Smart sync resumed from your last sync date, avoiding duplicate imports.
+                  </p>
+                </div>
+              )}
+              
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Accounts Synced</p>
