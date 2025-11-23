@@ -42,10 +42,26 @@ export function EditAccountModal({
   const [customFieldDraft, setCustomFieldDraft] = useState({ label: '', value: '' });
   const [saving, setSaving] = useState(false);
 
+  const [providerMetadata, setProviderMetadata] = useState<Record<string, any>>({});
+
   useEffect(() => {
     if (account?.custom_fields) {
       const value = account.custom_fields;
       let parsed: CustomField[] = [];
+      let metadata: Record<string, any> = {};
+
+      const metadataKeys = [
+        'institution_id',
+        'institution_name',
+        'institution_data',
+        'institution_logo',
+        'institution_url',
+        'provider_metadata',
+        'last_provider_sync',
+        'created_via_provider',
+        'first_sync_at',
+      ];
+
       if (Array.isArray(value)) {
         parsed = value
           .filter((field: any) => field && field.label)
@@ -56,13 +72,21 @@ export function EditAccountModal({
             value: field.value ?? '',
           }));
       } else if (typeof value === 'object') {
-        parsed = Object.entries(value).map(([key, val]) => ({
-          id: key,
-          label: key,
-          value: typeof val === 'string' ? val : JSON.stringify(val),
-        }));
+        // Separate metadata from custom fields
+        Object.entries(value).forEach(([key, val]) => {
+          if (metadataKeys.includes(key)) {
+            metadata[key] = val;
+          } else {
+            parsed.push({
+              id: key,
+              label: key,
+              value: typeof val === 'string' ? val : JSON.stringify(val),
+            });
+          }
+        });
       }
       setCustomFields(parsed);
+      setProviderMetadata(metadata);
     }
   }, [account?.custom_fields]);
 
@@ -96,7 +120,10 @@ export function EditAccountModal({
           tenantId,
           accountId: account.account_id || account.id,
           ...formData,
-          custom_fields: customFields,
+          custom_fields: {
+            ...providerMetadata, // Preserve metadata
+            ...customFields.reduce((acc, field) => ({ ...acc, [field.label]: field.value }), {}),
+          },
         }),
       });
 
@@ -234,6 +261,53 @@ export function EditAccountModal({
               placeholder="Internal notes about this account..."
             />
           </div>
+
+          {/* Provider Metadata (Read-only) */}
+          {Object.keys(providerMetadata).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Provider Data</h3>
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
+                {providerMetadata.institution_name && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Institution</span>
+                    <span className="font-medium">{providerMetadata.institution_name}</span>
+                  </div>
+                )}
+                {providerMetadata.provider_metadata?.subtype && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Account Subtype</span>
+                    <span className="font-medium capitalize">{providerMetadata.provider_metadata.subtype}</span>
+                  </div>
+                )}
+                {providerMetadata.provider_metadata?.official_name && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Official Name</span>
+                    <span className="font-medium">{providerMetadata.provider_metadata.official_name}</span>
+                  </div>
+                )}
+                {providerMetadata.provider_metadata?.verification_status && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Verification</span>
+                    <span className="font-medium capitalize">{providerMetadata.provider_metadata.verification_status}</span>
+                  </div>
+                )}
+                {providerMetadata.last_provider_sync && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Last Provider Sync</span>
+                    <span className="font-medium">{new Date(providerMetadata.last_provider_sync).toLocaleString()}</span>
+                  </div>
+                )}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-blue-600 text-xs font-medium select-none">
+                    View Raw Data
+                  </summary>
+                  <pre className="mt-2 p-2 bg-black/5 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                    {JSON.stringify(providerMetadata, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            </div>
+          )}
 
           {/* Custom Fields */}
           <div>

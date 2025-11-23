@@ -686,13 +686,19 @@ export default function ConnectionDetailPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Scopes</p>
+                  <p className="text-sm text-muted-foreground">
+                    {connection.provider === 'plaid' ? 'Products' : 'Scopes'}
+                  </p>
                   <div className="flex gap-1 flex-wrap">
-                    {token.scopes.map((scope) => (
-                      <Badge key={scope} variant="outline" className="text-xs">
-                        {scope}
-                      </Badge>
-                    ))}
+                    {token.scopes && token.scopes.length > 0 ? (
+                      token.scopes.map((scope) => (
+                        <Badge key={scope} variant="outline" className="text-xs">
+                          {scope}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-sm text-muted-foreground">N/A</span>
+                    )}
                   </div>
                 </div>
                 <div>

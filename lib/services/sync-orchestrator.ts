@@ -299,6 +299,19 @@ export async function orchestrateSync(options: SyncOptions): Promise<SyncResult>
           last_sync_accounts: accountsSynced,
           last_sync_transactions: transactionsSynced,
           last_sync_error: errors.length > 0 ? errors.join('; ') : null,
+          sync_summary: {
+            accounts_synced: accountsSynced,
+            transactions_synced: transactionsSynced,
+            accounts_created: metadata.steps?.find((s: any) => s.name === 'save_accounts')?.batchResult?.created || 0,
+            accounts_updated: metadata.steps?.find((s: any) => s.name === 'save_accounts')?.batchResult?.updated || 0,
+            transactions_created: metadata.steps?.find((s: any) => s.name === 'save_transactions')?.batchResult?.created || 0,
+            transactions_updated: metadata.steps?.find((s: any) => s.name === 'save_transactions')?.batchResult?.updated || 0,
+            sync_duration_ms: Date.now() - startTime,
+            errors: errors,
+            warnings: [],
+            started_at: new Date(startTime).toISOString(),
+            completed_at: new Date().toISOString(),
+          },
         })
         .eq('id', connectionId);
 

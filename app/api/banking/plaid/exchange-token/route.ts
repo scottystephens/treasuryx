@@ -156,6 +156,27 @@ export async function POST(req: NextRequest) {
             console.log('[Reconnection] Fetching accounts to check for reconnection...');
             const rawAccounts = await provider.fetchRawAccounts(credentials);
             
+            // Update connection name and token scopes if institution data is available
+            if (rawAccounts.institutionData?.name) {
+              const institutionName = rawAccounts.institutionData.name;
+              console.log(`[Metadata] Updating connection name to: ${institutionName} (Plaid)`);
+              
+              // Update connection name
+              await supabase
+                .from('connections')
+                .update({ name: `${institutionName} (Plaid)` })
+                .eq('id', connectionId);
+                
+              // Update token scopes (products)
+              if (rawAccounts.institutionData.products) {
+                console.log(`[Metadata] Updating token scopes to: ${rawAccounts.institutionData.products.join(', ')}`);
+                await supabase
+                  .from('provider_tokens')
+                  .update({ scopes: rawAccounts.institutionData.products })
+                  .eq('id', tokenData.id);
+              }
+            }
+            
             // STEP 2: Check if this is a reconnection
             const { detectReconnection, linkConnectionToAccounts, linkConnectionToTransactions, recordReconnectionEvent, getReconnectionSyncStartDate } = await import('@/lib/services/reconnection-service');
             
