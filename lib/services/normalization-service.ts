@@ -93,12 +93,26 @@ export class NormalizationService {
       return [];
     }
 
+    // Create a map of external account IDs to internal account IDs
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('account_id, external_account_id')
+      .eq('connection_id', connectionId);
+
+    const accountIdMap = new Map<string, string>();
+    accounts?.forEach(account => {
+      if (account.external_account_id) {
+        accountIdMap.set(account.external_account_id, account.account_id);
+      }
+    });
+
     const normalizedTxs = rawTxs.map((raw) => {
       const tx = raw.raw_transaction_data as any;
+      const internalAccountId = accountIdMap.get(tx.account_id) || tx.account_id; // Fallback to external if not found
 
       return {
         externalTransactionId: tx.transaction_id,
-        accountId: tx.account_id,
+        accountId: internalAccountId,  // Use internal account_id, not external
         date: new Date(tx.date),
         amount: Math.abs(tx.amount),  // Store absolute value, determine type below
         currency: tx.iso_currency_code || tx.unofficial_currency_code || 'USD',
@@ -210,8 +224,23 @@ export class NormalizationService {
       return [];
     }
 
+    // Create a map of external account IDs to internal account IDs
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('account_id, external_account_id')
+      .eq('connection_id', connectionId);
+
+    const accountIdMap = new Map<string, string>();
+    accounts?.forEach(account => {
+      if (account.external_account_id) {
+        accountIdMap.set(account.external_account_id, account.account_id);
+      }
+    });
+
     const normalizedTxs = rawTxs.map((raw) => {
       const tx = raw.raw_transaction_data as any;
+      const externalAccountId = tx.accountId || raw.account_id;
+      const internalAccountId = accountIdMap.get(externalAccountId) || externalAccountId; // Fallback to external if not found
 
       // Handle Tink amount structure
       const amount = this.formatTinkAmount(tx.amount?.value || tx.amount);
@@ -219,7 +248,7 @@ export class NormalizationService {
 
       return {
         externalTransactionId: tx.id,
-        accountId: tx.accountId || raw.account_id,
+        accountId: internalAccountId,  // Use internal account_id, not external
         date: new Date(tx.dates?.booked || tx.date),
         amount: Math.abs(amount),
         currency,
@@ -319,15 +348,30 @@ export class NormalizationService {
       return [];
     }
 
+    // Create a map of external account IDs to internal account IDs
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('account_id, external_account_id')
+      .eq('connection_id', connectionId);
+
+    const accountIdMap = new Map<string, string>();
+    accounts?.forEach(account => {
+      if (account.external_account_id) {
+        accountIdMap.set(account.external_account_id, account.account_id);
+      }
+    });
+
     const normalizedTxs = rawTxs.map((raw) => {
       const tx = raw.raw_transaction_data as any;
+      const externalAccountId = tx.accountId || raw.external_account_id;
+      const internalAccountId = accountIdMap.get(externalAccountId) || externalAccountId; // Fallback to external if not found
 
       const amount = this.parseDirectBankAmount(tx.amount || tx.value || tx.transactionAmount);
       const currency = tx.currency || tx.currencyCode || raw.currency || 'ZAR';
 
       return {
         externalTransactionId: tx.transactionId || tx.id || tx.reference,
-        accountId: tx.accountId || raw.external_account_id,
+        accountId: internalAccountId,  // Use internal account_id, not external
         date: new Date(tx.date || tx.transactionDate || tx.bookingDate || tx.valueDate),
         amount: Math.abs(amount),
         currency,
