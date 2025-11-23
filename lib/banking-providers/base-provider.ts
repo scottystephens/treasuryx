@@ -25,6 +25,12 @@ export interface ProviderAccount {
   iban?: string;
   bic?: string;
   status: 'active' | 'inactive' | 'closed';
+  // Institution information
+  institutionId?: string;      // Provider's institution identifier
+  institutionName?: string;    // Actual bank/institution name (e.g., "Chase", "ING Bank")
+  institutionLogo?: string;    // URL to institution logo
+  institutionUrl?: string;     // Institution website
+  institutionData?: Record<string, any>; // All raw institution data from provider
   metadata?: Record<string, any>;
 }
 

@@ -166,11 +166,20 @@ export async function createOrUpdateAccount(
         ...(providerAccount.iban && { iban: providerAccount.iban }),
         ...(providerAccount.bic && { bic: providerAccount.bic }),
         
-        // Merge provider metadata
+        // ✨ Update bank name if institution information is available
+        ...(providerAccount.institutionName && { bank_name: providerAccount.institutionName }),
+        
+        // Merge provider metadata + institution data
         custom_fields: {
           ...(existingAccount.custom_fields || {}),
           provider_metadata: providerAccount.metadata,
           last_provider_sync: now,
+          // ✨ Update ALL institution data
+          institution_id: providerAccount.institutionId,
+          institution_name: providerAccount.institutionName,
+          institution_logo: providerAccount.institutionLogo,
+          institution_url: providerAccount.institutionUrl,
+          institution_data: providerAccount.institutionData, // Complete raw data
         },
       };
 
@@ -235,7 +244,9 @@ export async function createOrUpdateAccount(
         external_account_id: providerAccount.externalAccountId,
         iban: providerAccount.iban,
         bic: providerAccount.bic,
-        bank_name: providerId.charAt(0).toUpperCase() + providerId.slice(1), // Capitalize provider name
+        // ✨ Use actual institution name instead of provider name
+        bank_name: providerAccount.institutionName || 
+                   (providerId.charAt(0).toUpperCase() + providerId.slice(1)), // Fallback to provider
         sync_enabled: true,
         last_synced_at: now,
         created_by: userId,
@@ -243,10 +254,18 @@ export async function createOrUpdateAccount(
           provider_metadata: providerAccount.metadata || {},
           created_via_provider: providerId,
           first_sync_at: now,
+          // ✨ Store ALL institution data
+          institution_id: providerAccount.institutionId,
+          institution_name: providerAccount.institutionName,
+          institution_logo: providerAccount.institutionLogo,
+          institution_url: providerAccount.institutionUrl,
+          institution_data: providerAccount.institutionData, // Complete raw data
         },
         // Handle legacy entity_id field - set to NULL if not provided (may need migration to make nullable)
         entity_id: null, // Legacy field - provider accounts don't require entities
       };
+
+      console.log(`🏦 Creating account with bank: ${newAccount.bank_name} (provider: ${providerId})`);
 
       const { data: createdAccount, error: createError } = await supabase
         .from('accounts')
@@ -258,7 +277,7 @@ export async function createOrUpdateAccount(
         throw new Error(`Failed to create account: ${createError.message}`);
       }
 
-      console.log(`✅ Created new account: ${providerAccount.accountName}`);
+      console.log(`✅ Created new account: ${providerAccount.accountName} at ${newAccount.bank_name}`);
 
       // ✨ Create initial daily balance statement
       const currency = providerAccount.currency || 'USD';

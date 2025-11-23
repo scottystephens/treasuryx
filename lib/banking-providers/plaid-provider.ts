@@ -112,9 +112,59 @@ export class PlaidProvider extends BankingProvider {
 
   async fetchAccounts(credentials: ConnectionCredentials): Promise<ProviderAccount[]> {
     try {
+      console.log('🏦 Fetching Plaid accounts and institution information...');
+      
       const response = await plaidClient.accountsGet({
         access_token: credentials.tokens.accessToken,
       });
+
+      // Fetch institution information using Item ID
+      let institutionName = 'Plaid'; // Fallback
+      let institutionId: string | null | undefined = null;
+      let institutionLogo: string | undefined;
+      let institutionUrl: string | undefined;
+      let institutionData: Record<string, any> | undefined;
+
+      try {
+        const itemResponse = await plaidClient.itemGet({
+          access_token: credentials.tokens.accessToken,
+        });
+
+        institutionId = itemResponse.data.item.institution_id || null;
+        
+        if (institutionId) {
+          console.log(`🔍 Fetching institution details for: ${institutionId}`);
+          
+          const instResponse = await plaidClient.institutionsGetById({
+            institution_id: institutionId,
+            country_codes: PLAID_COUNTRY_CODES as CountryCode[],
+          });
+
+          const institution = instResponse.data.institution;
+          institutionName = institution.name;
+          institutionLogo = institution.logo || undefined;
+          institutionUrl = institution.url || undefined;
+          
+          // Store ALL institution data
+          institutionData = {
+            institution_id: institution.institution_id,
+            name: institution.name,
+            products: institution.products,
+            country_codes: institution.country_codes,
+            url: institution.url,
+            primary_color: institution.primary_color,
+            logo: institution.logo,
+            routing_numbers: institution.routing_numbers,
+            oauth: institution.oauth,
+            status: institution.status,
+          };
+
+          console.log(`✅ Institution: ${institutionName}`);
+        }
+      } catch (instError: any) {
+        console.warn('⚠️  Could not fetch institution details:', instError.message);
+        // Continue with fallback values
+      }
 
       return response.data.accounts.map((account) => ({
         externalAccountId: account.account_id,
@@ -124,9 +174,27 @@ export class PlaidProvider extends BankingProvider {
         currency: account.balances.iso_currency_code || 'USD',
         balance: account.balances.current || 0,
         status: 'active',
+        // Institution information
+        institutionId: institutionId || undefined,
+        institutionName,
+        institutionLogo,
+        institutionUrl,
+        institutionData,
+        // Store ALL account data in metadata
         metadata: {
-            subtype: account.subtype,
-            officialName: account.official_name
+          subtype: account.subtype,
+          officialName: account.official_name,
+          account_id: account.account_id,
+          mask: account.mask,
+          type: account.type,
+          balances: {
+            available: account.balances.available,
+            current: account.balances.current,
+            limit: account.balances.limit,
+            iso_currency_code: account.balances.iso_currency_code,
+            unofficial_currency_code: account.balances.unofficial_currency_code,
+          },
+          verification_status: account.verification_status,
         }
       }));
     } catch (error) {

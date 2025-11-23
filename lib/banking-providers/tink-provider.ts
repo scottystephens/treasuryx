@@ -68,6 +68,7 @@ export class TinkProvider extends BankingProvider {
   // =====================================================
 
   async fetchAccounts(credentials: ConnectionCredentials): Promise<ProviderAccount[]> {
+    console.log('🏦 Fetching Tink accounts...');
     const tinkAccounts = await TinkClient.getAccounts(credentials.tokens.accessToken);
 
     // Map Tink accounts to provider accounts
@@ -91,6 +92,13 @@ export class TinkProvider extends BankingProvider {
         currency = account.currencyDenominatedBalance.currencyCode || 'EUR';
       }
 
+      // Extract institution information from financialInstitutionId
+      // Tink's financialInstitutionId is typically the bank identifier (e.g., "abnamro", "ing-nl")
+      const institutionId = account.financialInstitutionId;
+      let institutionName = institutionId ? this.mapTinkInstitutionIdToName(institutionId) : 'Tink';
+
+      console.log(`🏦 Account ${account.name}: Institution ${institutionId} → ${institutionName}`);
+
       return {
         externalAccountId: account.id,
         accountName: account.name || account.accountNumber || `Account ${account.id}`,
@@ -105,6 +113,10 @@ export class TinkProvider extends BankingProvider {
           ? account.identifiers.iban.bic
           : account.identifiers?.bban,
         status: account.closed ? 'closed' : 'active' as 'active' | 'inactive' | 'closed',
+        // Institution information
+        institutionId,
+        institutionName,
+        // Store ALL account data in metadata
         metadata: {
           tink_account_type: account.type,
           financial_institution_id: account.financialInstitutionId,
@@ -112,9 +124,73 @@ export class TinkProvider extends BankingProvider {
           flags: account.flags,
           refreshed: account.refreshed,
           created: account.created,
+          account_id: account.id,
+          identifiers: account.identifiers,
+          balances: account.balances,
+          account_exclusion: account.accountExclusion,
+          raw_account_data: account, // Store complete raw data
         },
       };
     });
+  }
+
+  /**
+   * Map Tink's financial institution ID to a readable bank name
+   * This is a best-effort mapping - in production, you might want to fetch this from Tink's Provider API
+   */
+  private mapTinkInstitutionIdToName(institutionId: string): string {
+    // Common European banks
+    const bankMap: Record<string, string> = {
+      'abnamro': 'ABN AMRO',
+      'ing-nl': 'ING Bank',
+      'rabobank': 'Rabobank',
+      'asnbank': 'ASN Bank',
+      'bunq': 'bunq',
+      'knab': 'Knab',
+      'regiobank': 'RegioBank',
+      'sns': 'SNS Bank',
+      'triodos': 'Triodos Bank',
+      'vanlanschot': 'Van Lanschot',
+      'revolut': 'Revolut',
+      'n26': 'N26',
+      'monzo': 'Monzo',
+      'starling': 'Starling Bank',
+      'hsbc': 'HSBC',
+      'barclays': 'Barclays',
+      'lloyds': 'Lloyds Bank',
+      'natwest': 'NatWest',
+      'santander': 'Santander',
+      'deutschebank': 'Deutsche Bank',
+      'commerzbank': 'Commerzbank',
+      'bnpparibas': 'BNP Paribas',
+      'creditmutuel': 'Crédit Mutuel',
+      'societegenerale': 'Société Générale',
+      'intesa': 'Intesa Sanpaolo',
+      'unicredit': 'UniCredit',
+    };
+
+    // Try lowercase match first
+    const lowerKey = institutionId.toLowerCase();
+    if (bankMap[lowerKey]) {
+      return bankMap[lowerKey];
+    }
+
+    // Try partial matches
+    for (const [key, name] of Object.entries(bankMap)) {
+      if (lowerKey.includes(key) || key.includes(lowerKey)) {
+        return name;
+      }
+    }
+
+    // If no match, return a cleaned-up version of the institution ID
+    return institutionId
+      .split('-')[0] // Remove country codes (e.g., "ing-nl" → "ing")
+      .split('_')[0] // Remove other separators
+      .replace(/([A-Z])/g, ' $1') // Add spaces before capitals
+      .trim()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   }
 
   async fetchAccount(
