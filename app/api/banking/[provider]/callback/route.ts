@@ -10,7 +10,7 @@ import {
   createIngestionJob,
   updateIngestionJob,
 } from '@/lib/supabase';
-import { performSync } from '@/lib/services/sync-service';
+import { orchestrateSync } from '@/lib/services/sync-orchestrator';
 import { recordSyncFailure } from '@/lib/services/connection-metadata-service';
 
 export const runtime = 'nodejs';
@@ -227,26 +227,37 @@ export async function GET(
 
       try {
         console.log('🔄 Starting automatic sync after OAuth (inline)...');
-        const syncResult = await performSync({
+
+        // Get provider and credentials for orchestrator
+        const provider = getProvider(providerId);
+        const credentials = {
           connectionId: connection.id,
           tenantId: connection.tenant_id,
-          providerId: providerId,
-          userId: user.id,
+          tokens: {
+            accessToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token,
+            expiresAt: tokenData.expires_at ? new Date(tokenData.expires_at) : undefined,
+          },
+        };
+
+        const syncResult = await orchestrateSync({
+          provider,
+          connectionId: connection.id,
+          tenantId: connection.tenant_id,
+          credentials,
           syncAccounts: true,
           syncTransactions: true,
-          forceSync: true, // Force initial sync to get full history
-          transactionDaysBack: 90, // Initial sync: get last 90 days
-          jobId: ingestionJob.id, // Use the job created earlier for tracking
+          userId: user.id,
         });
 
         if (!syncResult.success) {
-          syncWarning = syncResult.error || 'Sync completed with errors. Please try again.';
+          syncWarning = syncResult.errors.join('; ') || 'Sync completed with errors. Please try again.';
           console.error('❌ OAuth sync completed with warnings:', syncWarning);
         } else {
           console.log(`✅ OAuth sync completed:`, {
-            accountsSynced: syncResult.summary?.accountsSynced || 0,
-            transactionsSynced: syncResult.summary?.transactionsSynced || 0,
-            jobId: syncResult.jobId,
+            accountsSynced: syncResult.accountsSynced,
+            transactionsSynced: syncResult.transactionsSynced,
+            duration: syncResult.duration,
           });
         }
       } catch (syncError) {

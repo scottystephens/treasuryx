@@ -6,13 +6,13 @@ import {
   ProviderAccount,
   ProviderTransaction,
 } from './base-provider';
+import type {
+  RawAccountsResponse,
+  RawTransactionsResponse,
+  TransactionFetchOptions,
+} from './raw-types';
 import { plaidClient, PLAID_PRODUCTS, PLAID_COUNTRY_CODES } from '../plaid';
 import { CountryCode, Products } from 'plaid';
-import { 
-  syncPlaidTransactions, 
-  syncPlaidAccounts,
-  shouldSyncPlaidConnection 
-} from '../services/plaid-sync-service';
 
 export class PlaidProvider extends BankingProvider {
   config: BankingProviderConfig = {
@@ -319,82 +319,170 @@ export class PlaidProvider extends BankingProvider {
   }
 
   // =====================================================
-  // Optimized Connection-Level Sync
+  // NEW: Raw Data Methods (Primary methods going forward)
   // =====================================================
 
   /**
-   * Sync all transactions for a connection in ONE API call
-   * This is the cost-optimized approach - call once, distribute to accounts
-   * Returns transactions grouped by account
+   * Fetch raw accounts data directly from Plaid API
+   * Stores 100% of the API response in JSONB format for auto-detection of new fields
    */
-  async syncConnectionTransactions(
-    credentials: ConnectionCredentials,
-    options?: {
-      forceFullSync?: boolean;
-      importJobId?: string;
-    }
-  ): Promise<Map<string, ProviderTransaction[]>> {
-    console.log('🚀 Starting connection-level Plaid sync (optimized - ONE API call)');
-    
-    const syncResult = await syncPlaidTransactions(
-      credentials.tenantId,
-      credentials.connectionId,
-      credentials.tokens.accessToken,
-      options
-    );
+  async fetchRawAccounts(credentials: ConnectionCredentials): Promise<RawAccountsResponse> {
+    const startTime = Date.now();
 
-    console.log(`✅ Cursor-based sync complete:`, {
-      added: syncResult.transactionsAdded,
-      modified: syncResult.transactionsModified,
-      removed: syncResult.transactionsRemoved,
-      imported: syncResult.transactionsImported,
-      cursor: syncResult.cursor.substring(0, 20) + '...',
-    });
+    try {
+      console.log('[PlaidRaw] Fetching raw accounts from Plaid API...');
 
-    // Fetch the stored Plaid transactions from our database (not from API!)
-    const { supabase } = await import('../supabase');
-    const { data: plaidTxns } = await supabase
-      .from('plaid_transactions')
-      .select('*')
-      .eq('connection_id', credentials.connectionId)
-      .eq('sync_action', 'added')
-      .order('date', { ascending: false })
-      .limit(options?.importJobId ? 500 : 100); // Reasonable limit
-
-    // Group by Plaid account_id
-    const txnsByAccount = new Map<string, ProviderTransaction[]>();
-    
-    plaidTxns?.forEach(tx => {
-      if (!txnsByAccount.has(tx.account_id)) {
-        txnsByAccount.set(tx.account_id, []);
-      }
-      
-      txnsByAccount.get(tx.account_id)!.push({
-        externalTransactionId: tx.transaction_id,
-        accountId: tx.account_id,
-        date: new Date(tx.date),
-        amount: Math.abs(tx.amount), // Already reversed in storage
-        currency: tx.iso_currency_code || 'USD',
-        description: tx.merchant_name || tx.name,
-        type: tx.amount < 0 ? 'credit' : 'debit',
-        counterpartyName: tx.counterparty_name || tx.merchant_name || undefined,
-        category: tx.personal_finance_category_primary || undefined,
-        metadata: {
-          merchantName: tx.merchant_name,
-          personalFinanceCategory: {
-            primary: tx.personal_finance_category_primary,
-            detailed: tx.personal_finance_category_detailed,
-          },
-          pending: tx.pending,
-          paymentChannel: tx.payment_channel,
-        }
+      // Fetch accounts
+      const accountsResponse = await plaidClient.accountsGet({
+        access_token: credentials.tokens.accessToken,
       });
-    });
 
-    console.log(`📊 Distributed transactions: ${txnsByAccount.size} accounts`);
-    
-    return txnsByAccount;
+      // Fetch institution details (if available)
+      let institutionData = null;
+      try {
+        const itemResponse = await plaidClient.itemGet({
+          access_token: credentials.tokens.accessToken,
+        });
+
+        if (itemResponse.data.item.institution_id) {
+          console.log(`[PlaidRaw] Fetching institution details for: ${itemResponse.data.item.institution_id}`);
+
+          const instResponse = await plaidClient.institutionsGetById({
+            institution_id: itemResponse.data.item.institution_id,
+            country_codes: PLAID_COUNTRY_CODES as CountryCode[],
+          });
+          institutionData = instResponse.data.institution;
+        }
+      } catch (instError) {
+        console.warn('[PlaidRaw] Could not fetch institution details:', instError instanceof Error ? instError.message : String(instError));
+        // Continue without institution data
+      }
+
+      const result: RawAccountsResponse = {
+        provider: 'plaid',
+        connectionId: credentials.connectionId,
+        tenantId: credentials.tenantId,
+        responseType: 'accounts',
+        rawData: accountsResponse.data,  // COMPLETE Plaid response
+        accountCount: accountsResponse.data.accounts.length,
+        institutionData,
+        fetchedAt: new Date(),
+        apiEndpoint: '/accounts/get',
+        responseMetadata: {
+          statusCode: 200,
+          headers: {},
+          duration: Date.now() - startTime,
+        },
+      };
+
+      console.log(`[PlaidRaw] Successfully fetched ${result.accountCount} raw accounts`);
+      return result;
+
+    } catch (error) {
+      console.error('[PlaidRaw] Failed to fetch raw accounts:', error);
+      throw error;
+    }
   }
+
+  /**
+   * Fetch raw transactions data directly from Plaid API
+   * Stores 100% of the API response in JSONB format for auto-detection of new fields
+   */
+  async fetchRawTransactions(
+    credentials: ConnectionCredentials,
+    accountId: string,
+    options?: TransactionFetchOptions
+  ): Promise<RawTransactionsResponse> {
+    const startTime = Date.now();
+
+    try {
+      console.log(`[PlaidRaw] Fetching raw transactions for account ${accountId}...`);
+
+      // Use transactions/sync for incremental updates (cost-optimized)
+      const syncRequest: any = {
+        access_token: credentials.tokens.accessToken,
+        cursor: options?.cursor,
+      };
+
+      // Add date range if specified
+      if (options?.startDate) {
+        syncRequest.options = {
+          include_original_description: true,
+          include_personal_finance_category: true,
+        };
+        // Note: cursor-based sync doesn't use date filters directly
+      }
+
+      const transactionsResponse = await plaidClient.transactionsSync(syncRequest);
+
+      // Calculate total transaction count from added/modified/removed
+      const addedCount = transactionsResponse.data.added?.length || 0;
+      const modifiedCount = transactionsResponse.data.modified?.length || 0;
+      const removedCount = transactionsResponse.data.removed?.length || 0;
+      const totalTransactionCount = addedCount + modifiedCount + removedCount;
+
+      const result: RawTransactionsResponse = {
+        provider: 'plaid',
+        connectionId: credentials.connectionId,
+        tenantId: credentials.tenantId,
+        responseType: 'transactions',
+        rawData: transactionsResponse.data,  // COMPLETE Plaid sync response
+        transactionCount: totalTransactionCount,
+        fetchedAt: new Date(),
+        apiEndpoint: '/transactions/sync',
+        requestParams: {
+          cursor: options?.cursor,
+          accountId,
+        },
+        pagination: {
+          cursor: transactionsResponse.data.next_cursor,
+          hasMore: transactionsResponse.data.has_more,
+          nextPageToken: transactionsResponse.data.next_cursor,
+        },
+        responseMetadata: {
+          statusCode: 200,
+          headers: {},
+          duration: Date.now() - startTime,
+        },
+      };
+
+      console.log(`[PlaidRaw] Successfully fetched ${result.transactionCount} raw transactions`);
+      return result;
+
+    } catch (error) {
+      console.error(`[PlaidRaw] Failed to fetch raw transactions for account ${accountId}:`, error);
+
+      // Check if it's a Plaid API error with PRODUCT_NOT_READY
+      const errorObj = error as any;
+      if (errorObj?.response?.data?.error_code === 'PRODUCT_NOT_READY') {
+        console.log('[PlaidRaw] Plaid transactions not ready yet. Will retry on next sync.');
+        // Return empty response instead of throwing
+        return {
+          provider: 'plaid',
+          connectionId: credentials.connectionId,
+          tenantId: credentials.tenantId,
+          responseType: 'transactions',
+          rawData: { added: [], modified: [], removed: [], has_more: false },
+          transactionCount: 0,
+          fetchedAt: new Date(),
+          apiEndpoint: '/transactions/sync',
+          pagination: { hasMore: false },
+          responseMetadata: {
+            statusCode: 200,
+            headers: {},
+            duration: Date.now() - startTime,
+          },
+        };
+      }
+
+      throw error;
+    }
+  }
+
+  // =====================================================
+  // Optimized Connection-Level Sync
+  // =====================================================
+
 
   // =====================================================
   // User Information Methods

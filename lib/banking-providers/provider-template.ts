@@ -293,6 +293,137 @@ export class ProviderTemplate extends BankingProvider {
   }
 
   // =====================================================
+  // NEW: Raw Data Methods (Primary methods going forward)
+  // =====================================================
+
+  /**
+   * TODO: Implement raw accounts fetching
+   * Fetch raw accounts data directly from provider API
+   * Stores 100% of the API response in JSONB format for auto-detection of new fields
+   */
+  async fetchRawAccounts(credentials: ConnectionCredentials): Promise<import('./raw-types').RawAccountsResponse> {
+    const startTime = Date.now();
+
+    try {
+      console.log(`[${this.config.providerId}Raw] Fetching raw accounts from ${this.config.providerId} API...`);
+
+      // TODO: Replace with actual accounts endpoint
+      const response = await fetch('https://api.example.com/accounts', {
+        headers: {
+          Authorization: `Bearer ${credentials.tokens.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch accounts: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      const result: import('./raw-types').RawAccountsResponse = {
+        provider: this.config.providerId,
+        connectionId: credentials.connectionId,
+        tenantId: credentials.tenantId,
+        responseType: 'accounts',
+        rawData: data,  // COMPLETE provider response
+        accountCount: data.accounts?.length || 1,
+        fetchedAt: new Date(),
+        apiEndpoint: '/accounts',
+        responseMetadata: {
+          statusCode: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          duration: Date.now() - startTime,
+        },
+      };
+
+      console.log(`[${this.config.providerId}Raw] Successfully fetched ${result.accountCount} raw accounts`);
+      return result;
+
+    } catch (error) {
+      console.error(`[${this.config.providerId}Raw] Failed to fetch raw accounts:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * TODO: Implement raw transactions fetching
+   * Fetch raw transactions data directly from provider API
+   * Stores 100% of the API response in JSONB format for auto-detection of new fields
+   */
+  async fetchRawTransactions(
+    credentials: ConnectionCredentials,
+    accountId: string,
+    options?: import('./raw-types').TransactionFetchOptions
+  ): Promise<import('./raw-types').RawTransactionsResponse> {
+    const startTime = Date.now();
+
+    try {
+      console.log(`[${this.config.providerId}Raw] Fetching raw transactions for account ${accountId}...`);
+
+      // TODO: Replace with actual transactions endpoint
+      const params = new URLSearchParams({
+        accountId,
+      });
+
+      if (options?.startDate) {
+        params.append('startDate', options.startDate);
+      }
+      if (options?.endDate) {
+        params.append('endDate', options.endDate);
+      }
+      if (options?.limit) {
+        params.append('limit', options.limit.toString());
+      }
+
+      const response = await fetch(
+        `https://api.example.com/transactions?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.tokens.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch transactions: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      const result: import('./raw-types').RawTransactionsResponse = {
+        provider: this.config.providerId,
+        connectionId: credentials.connectionId,
+        tenantId: credentials.tenantId,
+        responseType: 'transactions',
+        rawData: data,  // COMPLETE provider response
+        transactionCount: data.transactions?.length || 0,
+        fetchedAt: new Date(),
+        apiEndpoint: '/transactions',
+        requestParams: {
+          accountId,
+          startDate: options?.startDate,
+          endDate: options?.endDate,
+          limit: options?.limit,
+        },
+        responseMetadata: {
+          statusCode: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          duration: Date.now() - startTime,
+        },
+      };
+
+      console.log(`[${this.config.providerId}Raw] Successfully fetched ${result.transactionCount} raw transactions`);
+      return result;
+
+    } catch (error) {
+      console.error(`[${this.config.providerId}Raw] Failed to fetch raw transactions for account ${accountId}:`, error);
+      throw error;
+    }
+  }
+
+  // =====================================================
   // User Information Methods
   // =====================================================
 

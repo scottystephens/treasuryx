@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { getProvider } from '@/lib/banking-providers/provider-registry';
 import { supabase, updateConnection, createIngestionJob, updateIngestionJob } from '@/lib/supabase';
-import { performSync } from '@/lib/services/sync-service';
+import { orchestrateSync } from '@/lib/services/sync-orchestrator';
 
 export async function POST(req: NextRequest) {
   try {
@@ -140,15 +140,26 @@ export async function POST(req: NextRequest) {
                 status: 'in_progress',
             });
 
-            const syncResult = await performSync({
-                connectionId,
-                tenantId: connection.tenant_id,
-                providerId,
-                userId: user.id,
-                syncAccounts: true,
-                syncTransactions: true,
-                forceSync: true,
-                jobId: ingestionJob.id,
+            // Get provider and credentials for orchestrator
+            const provider = getProvider(providerId);
+            const credentials = {
+              connectionId,
+              tenantId: connection.tenant_id,
+              tokens: {
+                accessToken: tokenData.access_token,
+                refreshToken: tokenData.refresh_token,
+                expiresAt: tokenData.expires_at ? new Date(tokenData.expires_at) : undefined,
+              },
+            };
+
+            const syncResult = await orchestrateSync({
+              provider,
+              connectionId,
+              tenantId: connection.tenant_id,
+              credentials,
+              syncAccounts: true,
+              syncTransactions: true,
+              userId: user.id,
             });
 
             const summary = (syncResult as any).summary || {};

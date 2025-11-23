@@ -1,6 +1,13 @@
 // Abstract Banking Provider Interface
 // All banking integrations should implement this interface
 
+import type {
+  RawAccountsResponse,
+  RawTransactionsResponse,
+  TransactionFetchOptions,
+  ConnectionCredentials as RawConnectionCredentials
+} from './raw-types';
+
 export interface BankingProviderConfig {
   providerId: string;
   displayName: string;
@@ -210,6 +217,30 @@ export abstract class BankingProvider {
 
     return transactionsByAccount;
   }
+
+  // =====================================================
+  // NEW: Raw Data Methods (Primary methods going forward)
+  // =====================================================
+
+  /**
+   * Fetch raw accounts data directly from provider API
+   * This method stores 100% of the API response in JSONB format
+   * @param credentials - Connection credentials including tokens
+   */
+  abstract fetchRawAccounts(credentials: RawConnectionCredentials): Promise<RawAccountsResponse>;
+
+  /**
+   * Fetch raw transactions data directly from provider API
+   * This method stores 100% of the API response in JSONB format
+   * @param credentials - Connection credentials
+   * @param accountId - External account ID
+   * @param options - Fetch options (date range, cursor, limit, etc.)
+   */
+  abstract fetchRawTransactions(
+    credentials: RawConnectionCredentials,
+    accountId: string,
+    options?: TransactionFetchOptions
+  ): Promise<RawTransactionsResponse>;
 
   // =====================================================
   // User Information Methods

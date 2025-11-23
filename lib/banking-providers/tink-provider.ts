@@ -9,6 +9,11 @@ import {
   ProviderTransaction,
   ConnectionCredentials,
 } from './base-provider';
+import type {
+  RawAccountsResponse,
+  RawTransactionsResponse,
+  TransactionFetchOptions,
+} from './raw-types';
 import * as TinkClient from '../tink-client';
 
 export class TinkProvider extends BankingProvider {
@@ -317,6 +322,102 @@ export class TinkProvider extends BankingProvider {
         },
       };
     });
+  }
+
+  // =====================================================
+  // NEW: Raw Data Methods (Primary methods going forward)
+  // =====================================================
+
+  /**
+   * Fetch raw accounts data directly from Tink API
+   * Stores 100% of the API response in JSONB format for auto-detection of new fields
+   */
+  async fetchRawAccounts(credentials: ConnectionCredentials): Promise<RawAccountsResponse> {
+    const startTime = Date.now();
+
+    try {
+      console.log('[TinkRaw] Fetching raw accounts from Tink API...');
+
+      const tinkAccounts = await TinkClient.getAccounts(credentials.tokens.accessToken);
+
+      const result: RawAccountsResponse = {
+        provider: 'tink',
+        connectionId: credentials.connectionId,
+        tenantId: credentials.tenantId,
+        responseType: 'accounts',
+        rawData: tinkAccounts,  // COMPLETE Tink accounts array
+        accountCount: tinkAccounts.length,
+        fetchedAt: new Date(),
+        apiEndpoint: '/api/v2/accounts',
+        responseMetadata: {
+          statusCode: 200,
+          headers: {},
+          duration: Date.now() - startTime,
+        },
+      };
+
+      console.log(`[TinkRaw] Successfully fetched ${result.accountCount} raw accounts`);
+      return result;
+
+    } catch (error) {
+      console.error('[TinkRaw] Failed to fetch raw accounts:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch raw transactions data directly from Tink API
+   * Stores 100% of the API response in JSONB format for auto-detection of new fields
+   */
+  async fetchRawTransactions(
+    credentials: ConnectionCredentials,
+    accountId: string,
+    options?: TransactionFetchOptions
+  ): Promise<RawTransactionsResponse> {
+    const startTime = Date.now();
+
+    try {
+      console.log(`[TinkRaw] Fetching raw transactions for account ${accountId}...`);
+
+      const transactions = await TinkClient.getTransactions(
+        credentials.tokens.accessToken,
+        accountId,
+        {
+          startDate: options?.startDate ? new Date(options.startDate) : undefined,
+          endDate: options?.endDate ? new Date(options.endDate) : undefined,
+          limit: options?.limit,
+        }
+      );
+
+      const result: RawTransactionsResponse = {
+        provider: 'tink',
+        connectionId: credentials.connectionId,
+        tenantId: credentials.tenantId,
+        responseType: 'transactions',
+        rawData: transactions,  // COMPLETE Tink transactions array
+        transactionCount: transactions.length,
+        fetchedAt: new Date(),
+        apiEndpoint: '/api/v2/transactions',
+        requestParams: {
+          accountId,
+          startDate: options?.startDate,
+          endDate: options?.endDate,
+          limit: options?.limit,
+        },
+        responseMetadata: {
+          statusCode: 200,
+          headers: {},
+          duration: Date.now() - startTime,
+        },
+      };
+
+      console.log(`[TinkRaw] Successfully fetched ${result.transactionCount} raw transactions`);
+      return result;
+
+    } catch (error) {
+      console.error(`[TinkRaw] Failed to fetch raw transactions for account ${accountId}:`, error);
+      throw error;
+    }
   }
 
   // =====================================================
