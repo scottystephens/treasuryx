@@ -94,10 +94,20 @@ export class NormalizationService {
     }
 
     // Create a map of external account IDs to internal account IDs
-    const { data: accounts } = await supabase
+    console.log(`[Normalization] Looking up accounts for Plaid connection ${connectionId}...`);
+    const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
       .select('account_id, external_account_id')
       .eq('connection_id', connectionId);
+
+    if (accountsError) {
+      console.error('[Normalization] Failed to fetch accounts for mapping:', accountsError);
+    }
+
+    console.log(`[Normalization] Found ${accounts?.length || 0} accounts for mapping`);
+    accounts?.forEach(account => {
+      console.log(`[Normalization] Account mapping: ${account.external_account_id} -> ${account.account_id}`);
+    });
 
     const accountIdMap = new Map<string, string>();
     accounts?.forEach(account => {
@@ -109,6 +119,7 @@ export class NormalizationService {
     const normalizedTxs = rawTxs.map((raw) => {
       const tx = raw.raw_transaction_data as any;
       const internalAccountId = accountIdMap.get(tx.account_id) || tx.account_id; // Fallback to external if not found
+      console.log(`[Normalization] Transaction ${tx.transaction_id}: external account ${tx.account_id} -> internal ${internalAccountId}`);
 
       return {
         externalTransactionId: tx.transaction_id,

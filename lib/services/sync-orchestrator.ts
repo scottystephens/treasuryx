@@ -97,13 +97,17 @@ export async function orchestrateSync(options: SyncOptions): Promise<SyncResult>
         const step2Start = Date.now();
 
         // Store raw data based on provider
+        console.log(`[SyncOrchestrator] Storing ${rawAccountsResponse.accountCount} raw accounts...`);
         if (providerId === 'plaid') {
           await rawStorageService.storePlaidAccounts(rawAccountsResponse);
+          console.log(`[SyncOrchestrator] Stored raw Plaid accounts successfully`);
         } else if (providerId === 'tink') {
           await rawStorageService.storeTinkAccounts(rawAccountsResponse);
+          console.log(`[SyncOrchestrator] Stored raw Tink accounts successfully`);
         } else {
           // Direct bank provider
           await rawStorageService.storeDirectBankAccounts(rawAccountsResponse, providerId);
+          console.log(`[SyncOrchestrator] Stored raw ${providerId} accounts successfully`);
         }
 
         metadata.steps.push({
@@ -192,13 +196,17 @@ export async function orchestrateSync(options: SyncOptions): Promise<SyncResult>
             totalTransactionsFetched += rawTxResponse.transactionCount;
 
             // Store raw transaction data based on provider
+            console.log(`[SyncOrchestrator] Storing ${rawTxResponse.transactionCount} raw transactions for account ${accountId}...`);
             if (providerId === 'plaid') {
               await rawStorageService.storePlaidTransactions(rawTxResponse);
+              console.log(`[SyncOrchestrator] Stored raw Plaid transactions successfully`);
             } else if (providerId === 'tink') {
               await rawStorageService.storeTinkTransactions(rawTxResponse);
+              console.log(`[SyncOrchestrator] Stored raw Tink transactions successfully`);
             } else {
               // Direct bank provider
               await rawStorageService.storeDirectBankTransactions(rawTxResponse, providerId);
+              console.log(`[SyncOrchestrator] Stored raw ${providerId} transactions successfully`);
             }
 
           } catch (accountError) {
@@ -240,6 +248,14 @@ export async function orchestrateSync(options: SyncOptions): Promise<SyncResult>
         const step7Start = Date.now();
 
         // Save transactions to standard table
+        console.log(`[SyncOrchestrator] About to batch save ${normalizedTxs.length} transactions...`);
+        console.log(`[SyncOrchestrator] Sample transaction:`, normalizedTxs[0] ? {
+          externalTransactionId: normalizedTxs[0].externalTransactionId,
+          accountId: normalizedTxs[0].accountId,
+          amount: normalizedTxs[0].amount,
+          description: normalizedTxs[0].description?.substring(0, 50)
+        } : 'No transactions');
+
         const txBatchResult = await batchCreateOrUpdateTransactions(
           tenantId,
           connectionId,
@@ -248,6 +264,7 @@ export async function orchestrateSync(options: SyncOptions): Promise<SyncResult>
           userId
         );
 
+        console.log(`[SyncOrchestrator] Batch result:`, txBatchResult);
         transactionsSynced = txBatchResult.summary.total;
 
         metadata.steps.push({
