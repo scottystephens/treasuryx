@@ -182,6 +182,7 @@ export async function POST(
       });
 
       console.log(`✅ Orchestrated sync completed in ${result.duration}ms`);
+      console.log(`📊 Final result: accounts=${result.accountsSynced}, transactions=${result.transactionsSynced}, success=${result.success}`);
 
       return NextResponse.json({
         success: result.success,
