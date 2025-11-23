@@ -162,17 +162,26 @@ export async function POST(req: NextRequest) {
               userId: user.id,
             });
 
-            const summary = (syncResult as any).summary || {};
             if (syncResult.success) {
                 await updateIngestionJob(ingestionJob.id, {
                     status: 'completed',
-                    records_processed: (summary.accountsSynced || 0) + (summary.transactionsSynced || 0),
-                    records_imported: (summary.accountsSynced || 0) + (summary.transactionsSynced || 0),
+                    records_processed: syncResult.accountsSynced + syncResult.transactionsSynced,
+                    records_imported: syncResult.accountsSynced + syncResult.transactionsSynced,
+                    completed_at: new Date().toISOString(),
+                    summary: {
+                        accounts_synced: syncResult.accountsSynced,
+                        transactions_synced: syncResult.transactionsSynced,
+                        accounts_created: syncResult.accountsSynced,  // For initial sync, all are new
+                        accounts_updated: 0,
+                        errors: syncResult.errors,
+                        duration_ms: syncResult.duration,
+                    },
                 });
             } else {
                 await updateIngestionJob(ingestionJob.id, {
                     status: 'failed',
-                    error_message: (syncResult as any).error || 'Sync failed',
+                    error_message: syncResult.errors.join('; ') || 'Sync failed',
+                    completed_at: new Date().toISOString(),
                 });
             }
 

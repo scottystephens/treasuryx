@@ -186,7 +186,14 @@ export async function POST(
         records_imported: result.accountsSynced + result.transactionsSynced,
         records_failed: result.errors.length,
         completed_at: new Date().toISOString(),
-        summary: result,
+        summary: {
+          accounts_synced: result.accountsSynced,
+          transactions_synced: result.transactionsSynced,
+          accounts_created: 0,  // Manual sync doesn't create new accounts
+          accounts_updated: result.accountsSynced,
+          errors: result.errors,
+          duration_ms: result.duration,
+        },
       });
 
       console.log(`✅ Orchestrated sync completed in ${result.duration}ms`);
