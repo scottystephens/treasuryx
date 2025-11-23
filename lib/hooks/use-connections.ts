@@ -144,11 +144,8 @@ export function useSyncConnection() {
         queryKey: connectionKeys.detail(variables.tenantId, variables.connectionId),
       });
       
-      // Show initial toast - job has started, not completed yet
-      toast.info('Sync started', {
-        description: 'Fetching your accounts and transactions. This may take a few moments.',
-        duration: 5000,
-      });
+      // Note: Toast notifications are now handled by the calling component
+      // to ensure proper timing (start toast before API call, success toast after)
     },
     onError: (error) => {
       toast.error('Sync failed', {
