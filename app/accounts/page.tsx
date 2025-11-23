@@ -76,9 +76,9 @@ export default function AccountsPage() {
     <div className="flex h-screen">
       <Navigation />
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="p-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
           {/* Compact Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-bold">Accounts</h1>
               <p className="text-sm text-muted-foreground">{accounts.length} accounts · {formatCurrency(totalBalance)}</p>
@@ -151,7 +151,7 @@ export default function AccountsPage() {
                       <th className="text-left p-3 text-xs font-medium text-muted-foreground">Account</th>
                       <th className="text-left p-3 text-xs font-medium text-muted-foreground">Type</th>
                       <th className="text-left p-3 text-xs font-medium text-muted-foreground">Bank</th>
-                      <th className="text-left p-3 text-xs font-medium text-muted-foreground">Source</th>
+                      <th className="text-left p-3 text-xs font-medium text-muted-foreground">Sync</th>
                       <th className="text-right p-3 text-xs font-medium text-muted-foreground">Balance</th>
                       <th className="text-right p-3 text-xs font-medium text-muted-foreground">Actions</th>
                     </tr>
@@ -183,7 +183,7 @@ export default function AccountsPage() {
                           <span className="text-sm">{account.bank_name || '-'}</span>
                         </td>
                         <td className="p-3">
-                          {account.connection_provider ? (
+                          {account.is_synced && account.connection_provider ? (
                             <ProviderBadge
                               provider={account.connection_provider}
                               connectionName={account.connection_name}
@@ -191,7 +191,7 @@ export default function AccountsPage() {
                               showLink={false}
                             />
                           ) : (
-                            <span className="text-xs text-muted-foreground">Manual</span>
+                            <Badge variant="outline" className="text-xs">Manual</Badge>
                           )}
                         </td>
                         <td className="p-3 text-right">

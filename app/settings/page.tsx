@@ -110,9 +110,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Organization Settings</h1>
           <p className="text-gray-600 mt-2">Manage your organization details and preferences</p>
         </div>

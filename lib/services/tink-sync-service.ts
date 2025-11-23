@@ -63,32 +63,39 @@ export async function syncTinkAccounts(
 
         await supabase
           .from('tink_accounts')
-          .upsert({
-            tenant_id: tenantId,
-            connection_id: connectionId,
-            account_id: account.id,
-            financial_institution_id: account.financialInstitutionId,
-            name: account.name,
-            account_number: account.accountNumber,
-            account_type: account.type,
-            holder_name: account.holderName,
-            iban: typeof account.identifiers?.iban === 'object'
-              ? account.identifiers.iban.iban
-              : account.identifiers?.iban,
-            bic: typeof account.identifiers?.iban === 'object'
-              ? account.identifiers.iban.bic
-              : undefined,
-            bban: account.identifiers?.bban,
-            balance_booked: balanceBooked,
-            balance_available: balanceAvailable,
-            currency_code: currencyCode,
-            closed: account.closed || false,
-            flags: account.flags,
-            account_exclusion: account.accountExclusion,
-            refreshed: account.refreshed,
-            created: account.created,
-            raw_data: account as any,
-            last_updated_at: new Date().toISOString(),
+          .upsert(
+            {
+              tenant_id: tenantId,
+              connection_id: connectionId,
+              account_id: account.id,
+              financial_institution_id: account.financialInstitutionId,
+              name: account.name,
+              account_number: account.accountNumber,
+              account_type: account.type,
+              holder_name: account.holderName,
+              iban: typeof account.identifiers?.iban === 'object'
+                ? account.identifiers.iban.iban
+                : account.identifiers?.iban,
+              bic: typeof account.identifiers?.iban === 'object'
+                ? account.identifiers.iban.bic
+                : undefined,
+              bban: account.identifiers?.bban,
+              balance_booked: balanceBooked,
+              balance_available: balanceAvailable,
+              currency_code: currencyCode,
+              closed: account.closed || false,
+              flags: account.flags,
+              account_exclusion: account.accountExclusion,
+              refreshed: account.refreshed,
+              created: account.created,
+              raw_data: account as any,
+              last_updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: 'connection_id,account_id',
+            },
+          );
+
         // Find the normalized account to create statement
         // Query by external_account_id which is set to Tink's account_id during account creation
         const { data: normalizedAccount, error: accountLookupError } = await supabase
@@ -144,6 +151,11 @@ export async function syncTinkAccounts(
         } else {
           console.warn(`⚠️  No normalized account found for Tink account ${account.name} (${account.id})`);
         }
+
+      } catch (accountError: any) {
+        console.error(`❌ Error processing Tink account ${account.id}:`, accountError);
+        errors.push(`Failed to process account ${account.name}: ${accountError?.message || accountError}`);
+      }
     }
 
     return { accounts: tinkAccounts, errors };

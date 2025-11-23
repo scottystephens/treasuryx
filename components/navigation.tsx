@@ -6,9 +6,7 @@ import { useState } from 'react'
 import { 
   LayoutDashboard, 
   Wallet, 
-  Building2, 
-  Send,
-  TrendingUp,
+  Building2,
   DollarSign,
   Settings,
   ChevronDown,
@@ -29,10 +27,7 @@ import { StratifiLogo } from './stratifi-logo'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Accounts', href: '/accounts', icon: Wallet },
-  { name: 'Cash Management', href: '/cash', icon: TrendingUp },
   { name: 'Entities', href: '/entities', icon: Building2 },
-  { name: 'Payments', href: '/payments', icon: Send },
-  { name: 'Analytics', href: '/analytics', icon: TrendingUp },
   { name: 'Exchange Rates', href: '/rates', icon: DollarSign },
   { name: 'Connections', href: '/connections', icon: Database },
 ]

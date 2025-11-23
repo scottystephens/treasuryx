@@ -16,22 +16,24 @@ scripts/
 
 ## 📊 Migrations (`migrations/`)
 
-SQL files to set up and enhance database tables. **Run in order:**
+**38+ SQL migration files** to set up and enhance database tables.
 
-### Core Setup
-1. **01-create-base-tables.sql** - Base tables (accounts, entities, transactions, payments, forecasts)
-2. **02-setup-multi-tenant.sql** - Multi-tenancy (tenants, user_tenants, RLS policies)
-3. **03-seed-multi-tenant-data.sql** - Mock multi-tenant data (3 organizations)
+### 📚 Complete Migration Documentation
+See **[docs/migrations/MIGRATIONS_LIST.md](../docs/migrations/MIGRATIONS_LIST.md)** for:
+- Complete list of all migrations (01-38+)
+- Execution order and status
+- Provider-specific tables (Plaid, Tink, Standard Bank)
+- Architecture patterns
+- Rollback procedures
+- Verification queries
 
-### Feature Enhancements
-4. **04-setup-data-ingestion-safe.sql** - Data ingestion tables (connections, jobs, raw_data, audit)
-5. **05-enhance-accounts-safe.sql** - Enhance accounts with custom fields & industry-standard fields
-6. **create-exchange-rates-table.sql** - Exchange rates table
+### Quick Start
+```bash
+# Run migrations via Supabase CLI (preferred)
+npx tsx scripts/utilities/run-migration-cli.ts scripts/migrations/XX-name.sql
+```
 
-### How to Run
-1. Open [Supabase SQL Editor](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new)
-2. Copy contents of SQL file
-3. Paste and click "Run"
+**Alternative:** Use [Supabase SQL Editor](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new)
 
 ---
 
@@ -133,8 +135,10 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ## 📚 Documentation
 
-See `docs/` folder for detailed documentation:
-- Architecture guides
-- Feature documentation  
-- Deployment guides
+### Key Documentation Links
+- **[Migrations Documentation](../docs/migrations/)** - Complete migration guide
+- **[Operations Runbook](../docs/operations/CURSOR_SUPABASE_VERCEL_RUNBOOK.md)** - CLI commands and workflows
+- **[Testing Documentation](../docs/testing/)** - Test strategy and coverage
+- **[Architecture Guides](../docs/architecture/)** - System architecture
+- **[Feature Docs](../docs/features/)** - Provider integrations
 

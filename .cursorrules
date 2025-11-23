@@ -42,6 +42,28 @@ Stratifi is a **Strategic Financial Intelligence Platform** - a production-ready
 
 ---
 
+## Supabase & Vercel CLI Usage
+
+### Supabase Migrations (Preferred Method)
+- **Always use Supabase CLI via npx** (no global install needed): `npx supabase`
+- **Run migrations:** `cd /Users/scottstephens/stratifi && npx tsx scripts/utilities/run-migration-cli.ts scripts/migrations/XX-name.sql`
+- **Link project (if needed):** `cd /Users/scottstephens/stratifi && npx supabase link --project-ref vnuithaqtpgbwmdvtxik`
+- **Don't use `psql`** - DNS resolution fails in this environment
+- **For queries:** Use TypeScript with Supabase client or `scripts/utilities/run-migration.ts` for raw SQL
+
+### Vercel Deployments
+- **Production:** `cd /Users/scottstephens/stratifi && vercel --prod`
+- **Preview:** `cd /Users/scottstephens/stratifi && vercel`
+- **Logs:** `cd /Users/scottstephens/stratifi && vercel logs stratifi.vercel.app --since 1h`
+- **Env vars:** `cd /Users/scottstephens/stratifi && vercel env pull .env.local`
+
+### General CLI Rules
+- Always start commands with `cd /Users/scottstephens/stratifi &&`
+- Use absolute paths when possible
+- Full reference: `docs/CURSOR_SUPABASE_VERCEL_RUNBOOK.md`
+
+---
+
 ## Architecture Patterns
 
 ### 1. Multi-Tenant System
@@ -542,14 +564,24 @@ npm run build            # Build for production
 npm run start            # Start production server
 npm run lint             # Run ESLint
 
-# Database
-npx tsx scripts/utilities/run-migration.ts  # Run migrations
+# Database Migrations (Preferred Method)
+npx tsx scripts/utilities/run-migration-cli.ts scripts/migrations/XX-name.sql  # Run migrations via Supabase CLI
+npx supabase link --project-ref vnuithaqtpgbwmdvtxik  # Link project (one-time)
+
+# Database (Alternative Methods)
+npx tsx scripts/utilities/run-migration.ts  # Run migrations via exec_sql RPC
 npx tsx scripts/data-generation/create-test-user.ts  # Create test user
 
 # Generate test data
 npx tsx scripts/data-generation/setup-test-user-org.ts
 npx tsx scripts/data-generation/create-test-accounts-v2.ts
 npx tsx scripts/data-generation/generate-bank-statements.ts
+
+# Vercel Deployments
+vercel --prod            # Deploy to production
+vercel                    # Deploy to preview
+vercel logs stratifi.vercel.app --since 1h  # View logs
+vercel env pull .env.local  # Pull env vars
 ```
 
 ---
@@ -575,47 +607,25 @@ DATABASE_URL="postgresql://postgres:[PASSWORD]@db.vnuithaqtpgbwmdvtxik.supabase.
 
 ### 🔴 CRITICAL: How to Run SQL Migrations
 
-**There are TWO reliable methods for running SQL migrations on production Supabase.**
-
-#### Method 1: PostgreSQL CLI via psql (✅ VERIFIED WORKING)
+**Preferred Method: Supabase CLI via npx (✅ WORKING)**
 
 **Use this for schema changes and migrations:**
 
 ```bash
-# Load environment variables and run migration
-source .env.local && psql "$DATABASE_URL" -f scripts/migrations/XX-migration-name.sql
+# Run a migration (automated - copies to supabase/migrations/ and pushes)
+cd /Users/scottstephens/stratifi && npx tsx scripts/utilities/run-migration-cli.ts scripts/migrations/XX-name.sql
 
-# Verify tables created
-source .env.local && psql "$DATABASE_URL" -c "
-SELECT table_name FROM information_schema.tables 
-WHERE table_name = 'your_table_name';"
-
-# Test with a simple query
-source .env.local && psql "$DATABASE_URL" -c "SELECT NOW();"
+# Link to project (one-time setup if needed)
+cd /Users/scottstephens/stratifi && npx supabase link --project-ref vnuithaqtpgbwmdvtxik
 ```
 
-**Example:**
-```bash
-# Run migration 29
-source .env.local && psql "$DATABASE_URL" -f scripts/migrations/29-create-plaid-storage.sql
+**Key Points:**
+- ✅ Uses `npx supabase` (no global install needed)
+- ✅ Helper script handles migration copying and naming automatically
+- ✅ Fully automated with `--yes` flag (no prompts)
+- ❌ Don't use `psql` - DNS resolution fails in this environment
 
-# Verify it worked
-source .env.local && psql "$DATABASE_URL" -c "
-SELECT table_name FROM information_schema.tables 
-WHERE table_name IN ('plaid_sync_cursors', 'plaid_transactions', 'plaid_accounts');"
-```
-
-**Prerequisites:**
-- PostgreSQL client installed (`brew install postgresql` on macOS)
-- `.env.local` file with `DATABASE_URL` set
-- `psql` in PATH (`which psql` to verify)
-
-**Troubleshooting:**
-- If `psql` not found: `brew install postgresql`
-- If connection fails: Verify `DATABASE_URL` in `.env.local`
-- If permission denied: Check service role key is correct
-
-#### Method 2: Supabase SQL Editor (Browser-Based)
+**Alternative Method: Supabase SQL Editor (Browser-Based)**
 
 **Use this when psql is not available or for interactive queries:**
 
@@ -641,16 +651,16 @@ WHERE table_name IN ('plaid_sync_cursors', 'plaid_transactions', 'plaid_accounts
 
 ```bash
 # Run data generation scripts
-npx tsx scripts/data-generation/create-test-user.ts
-npx tsx scripts/data-generation/setup-test-user-org.ts
-npx tsx scripts/data-generation/create-test-accounts-v2.ts
+cd /Users/scottstephens/stratifi && npx tsx scripts/data-generation/create-test-user.ts
+cd /Users/scottstephens/stratifi && npx tsx scripts/data-generation/setup-test-user-org.ts
+cd /Users/scottstephens/stratifi && npx tsx scripts/data-generation/create-test-accounts-v2.ts
 
 # Run utility scripts
-npx tsx scripts/utilities/backfill-exchange-rates.ts
-npx tsx scripts/utilities/verify-test-user.ts
+cd /Users/scottstephens/stratifi && npx tsx scripts/utilities/backfill-exchange-rates.ts
+cd /Users/scottstephens/stratifi && npx tsx scripts/utilities/verify-test-user.ts
 ```
 
-**Note:** These scripts require `.env.local` to be loaded properly and use the Supabase client library (`lib/supabase.ts`) with the service role key.
+**Note:** These scripts require `.env.local` to be loaded properly and use the Supabase client library (`lib/supabase.ts`) with the service role key. For schema migrations, use Method 1 (Supabase CLI) instead.
 
 ---
 
@@ -1104,74 +1114,45 @@ rm .env.verify
 
 ### Adding a New Database Feature
 ```bash
-# 1. Create migration locally
-supabase migration new add-new-feature
+# 1. Create migration file in scripts/migrations/XX-descriptive-name.sql
 
-# 2. Edit the migration file in scripts/migrations/
+# 2. Run migration via Supabase CLI
+cd /Users/scottstephens/stratifi && npx tsx scripts/utilities/run-migration-cli.ts scripts/migrations/XX-name.sql
 
-# 3. Test migration on remote database
-supabase db push
-
-# 4. Generate new TypeScript types
-supabase gen types typescript --project-id vnuithaqtpgbwmdvtxik > lib/database.types.ts
-
-# 5. Build and test locally
+# 3. Build and test locally
 npm run build
 
-# 6. Deploy to production
-vercel --prod
+# 4. Deploy to production
+cd /Users/scottstephens/stratifi && vercel --prod
 ```
 
 ### Setting Up New Environment
 ```bash
-# 1. Install CLI tools
-npm install -g vercel supabase
-
-# 2. Authenticate
+# 1. Authenticate Vercel
 vercel login
-supabase login
 
-# 3. Link projects
-vercel link
-supabase link --project-ref vnuithaqtpgbwmdvtxik
+# 2. Link projects
+cd /Users/scottstephens/stratifi && vercel link
+cd /Users/scottstephens/stratifi && npx supabase link --project-ref vnuithaqtpgbwmdvtxik
 
-# 4. Pull environment variables
-vercel env pull .env.local
+# 3. Pull environment variables
+cd /Users/scottstephens/stratifi && vercel env pull .env.local
 
-# 5. Test local development
+# 4. Test local development
 npm run dev
 ```
 
 ### Debugging Production Issues
 ```bash
 # 1. Check application logs
-vercel logs stratifi.vercel.app --follow
+cd /Users/scottstephens/stratifi && vercel logs stratifi.vercel.app --follow
 
-# 2. Check database directly
-supabase db shell
-# Then run SQL queries to investigate
+# 2. Verify environment variables
+cd /Users/scottstephens/stratifi && vercel env ls production
 
-# 3. Verify environment variables
-vercel env ls production
-
-# 4. Test with production data locally
-vercel env pull .env.local
+# 3. Test with production data locally
+cd /Users/scottstephens/stratifi && vercel env pull .env.local
 npm run dev
-```
-
-### Database Backup Before Major Changes
-```bash
-# 1. Export current schema
-supabase db pull
-
-# 2. Save schema to backup file
-supabase db dump --data-only > backup-$(date +%Y%m%d).sql
-
-# 3. Run your changes
-supabase db push
-
-# 4. If something goes wrong, restore from backup
-# supabase db execute --file backup-YYYYMMDD.sql
 ```
 
 ---

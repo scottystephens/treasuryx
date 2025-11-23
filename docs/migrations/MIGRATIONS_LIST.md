@@ -187,6 +187,26 @@ This document lists all database migrations in execution order. Each migration b
 **Tables:** exchange_rates
 **Status:** Currency features
 
+### ✅ 37-create-banking-credentials.sql
+**Purpose:** Secure credential storage for direct bank APIs
+**Tables:** banking_provider_credentials
+**Features:** AES-256-GCM encryption, tenant-scoped storage
+**Status:** Security infrastructure
+
+### 🚀 38-create-direct-bank-docs.sql ✅ LATEST
+**Purpose:** Documentation links for direct bank credential fields
+**Tables:** direct_bank_provider_docs
+**Features:** 
+- Standard Bank South Africa credential documentation
+- Multiple subscription keys support (Balance Enquiry, Transactions, Payments)
+- Inline help text and external documentation links
+**Providers:** Standard Bank (SA)
+**Rationale:** 
+- Each OneHub API product requires a separate subscription key
+- Collect subscriptionKeyBalances, subscriptionKeyTransactions, subscriptionKeyPayments
+- Proper credential collection for read-only bank data access
+**Status:** ✅ **READY FOR DEPLOYMENT**
+
 ---
 
 ## Migration Execution

@@ -178,7 +178,10 @@ Create `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+CREDENTIAL_ENCRYPTION_KEY=base64_or_hex_32_byte_key
 ```
+
+> Generate `CREDENTIAL_ENCRYPTION_KEY` with `openssl rand -base64 32`. This key encrypts direct-bank credentials (Standard Bank, future providers) using AES-256-GCM before they are stored in Supabase.
 
 ### 3. Run Database Migrations
 Run SQL files in `scripts/migrations/` in order (01-05) via [Supabase SQL Editor](https://supabase.com/dashboard/project/vnuithaqtpgbwmdvtxik/sql/new)

@@ -264,9 +264,11 @@ export default function DashboardPage() {
 
   if (initialLoading) {
     return (
-      <div className="p-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-background">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
         </div>
       </div>
     );
@@ -306,8 +308,9 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-background">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
@@ -909,6 +912,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         )}
+        </div>
       </div>
     </div>
   );

@@ -132,6 +132,8 @@ export class PlaidProvider extends BankingProvider {
 
         institutionId = itemResponse.data.item.institution_id || null;
         
+        console.log(`📋 Plaid Item ID: ${itemResponse.data.item.item_id}, Institution ID: ${institutionId || 'NOT PROVIDED'}`);
+        
         if (institutionId) {
           console.log(`🔍 Fetching institution details for: ${institutionId}`);
           
@@ -160,9 +162,12 @@ export class PlaidProvider extends BankingProvider {
           };
 
           console.log(`✅ Institution: ${institutionName}`);
+        } else {
+          console.warn(`⚠️  Plaid did not provide institution_id (likely Sandbox mode) - using fallback: ${institutionName}`);
         }
       } catch (instError: any) {
-        console.warn('⚠️  Could not fetch institution details:', instError.message);
+        console.error('❌ Failed to fetch institution details:', instError.message);
+        console.error('Error details:', JSON.stringify(instError, null, 2));
         // Continue with fallback values
       }
 

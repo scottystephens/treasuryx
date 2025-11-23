@@ -189,7 +189,7 @@ export default function ConnectionsPage() {
       <Navigation />
       
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="p-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>

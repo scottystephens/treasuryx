@@ -27,6 +27,12 @@ import {
 } from '@/lib/services/transaction-sync-service';
 import { performPlaidSync } from '@/lib/services/plaid-sync-service';
 import { performTinkSync } from '@/lib/services/tink-sync-service';
+import { 
+  checkRateLimit, 
+  createRateLimitResponse, 
+  getRateLimitIdentifier,
+  getIpAddress 
+} from '@/lib/security/rate-limit';
 
 export async function POST(
   req: NextRequest,
@@ -44,6 +50,23 @@ export async function POST(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // ===== RATE LIMITING =====
+    // Banking syncs are expensive API calls - limit to 10 per hour per user
+    const ipAddress = getIpAddress(req.headers);
+    const rateLimitId = getRateLimitIdentifier(user.id, ipAddress);
+    const rateLimitResult = await checkRateLimit(rateLimitId, 'banking');
+    
+    if (!rateLimitResult.success) {
+      console.log('[RATE_LIMIT] Banking sync blocked:', {
+        userId: user.id,
+        provider: providerId,
+        remaining: rateLimitResult.remaining,
+        reset: new Date(rateLimitResult.reset).toISOString(),
+      });
+      return createRateLimitResponse(rateLimitResult);
+    }
+    // ===== END RATE LIMITING =====
 
     // Parse request body
     const body = await req.json();

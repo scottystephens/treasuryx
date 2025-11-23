@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { BankingProviderCard } from '@/components/banking-provider-card';
 import { Upload, ArrowRight, ArrowLeft, FileText, CheckCircle2, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import type { Account } from '@/lib/supabase';
+import { DirectBankApiCard } from '@/components/connections/direct-bank-api-card';
 
 // Step 0: Connection Type Selection
 // Step 1: File Upload (CSV) or Banking Provider OAuth (Tink)
@@ -281,6 +282,10 @@ export default function NewConnectionPage() {
                   </div>
                 </div>
               )}
+
+              <div>
+                <DirectBankApiCard tenantId={currentTenant.id} />
+              </div>
 
               {/* CSV Import Option */}
               <div>
