@@ -183,12 +183,24 @@ export async function orchestrateSync(options: SyncOptions): Promise<SyncResult>
           try {
             console.log(`[SyncOrchestrator] Fetching transactions for account ${accountId}...`);
 
+            // Get cursor for incremental sync (Plaid only)
+            let cursor: string | undefined;
+            if (providerId === 'plaid') {
+              cursor = await rawStorageService.getPlaidCursor(connectionId);
+              if (cursor) {
+                console.log(`[SyncOrchestrator] Using Plaid cursor for incremental sync: ${cursor.substring(0, 20)}...`);
+              } else {
+                console.log('[SyncOrchestrator] No Plaid cursor found - performing full sync');
+              }
+            }
+
             const rawTxResponse = await provider.fetchRawTransactions(
               credentials,
               accountId,
               {
                 startDate,
                 endDate,
+                cursor, // Pass cursor for incremental sync
                 // Add pagination support here if needed
               }
             );

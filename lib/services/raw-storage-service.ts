@@ -170,6 +170,25 @@ export class RawStorageService {
     }
   }
 
+  /**
+   * Get Plaid sync cursor for a connection
+   */
+  async getPlaidCursor(connectionId: string): Promise<string | undefined> {
+    const { data, error } = await supabase
+      .from('plaid_sync_cursors')
+      .select('cursor')
+      .eq('connection_id', connectionId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[RawStorage] Failed to get Plaid cursor:', error);
+      // Don't throw, just return undefined to trigger full sync
+      return undefined;
+    }
+
+    return data?.cursor || undefined;
+  }
+
   // ==========================================
   // TINK RAW STORAGE
   // ==========================================
